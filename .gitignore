@@ -1,4 +1,4 @@
 *.o
-./main
-./.sconsign.dblite
+main
+.sconsign.dblite
 compile_commands.json

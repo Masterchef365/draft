@@ -22,7 +22,6 @@
 	CLIENT(joystick) \
 	CLIENT(vision) \
 
-
 /* Polling file descriptor mapping table (unique names 
  * for each pollfd defined in the CLIENTS() macro */
 #define CLIENT(NAME) struct pollfd NAME;
@@ -33,11 +32,14 @@ typedef struct ClientFds {
 
 /* Handler struct (pollfd's, server address info) */
 typedef struct ClientHandler {
-	int server_sockfd;
-	struct sockaddr_in serv_addr;
-	struct sockaddr_in cli_addr;
-	socklen_t clilen;
-	ClientFds clients;
+	int server_sockfd; /* Server socket file descriptor */
+	struct sockaddr_in serv_addr; /* Server address struct */
+	struct sockaddr_in cli_addr; /* Client address struct */
+	socklen_t clilen; /* Length of client address struct */
+	ClientFds clients; /* Client polling file descriptors */
+	/* Polling timeout interval (Balence of delay when accepting 
+	 * new clients vs server CPU usage), 10ms is a good start */
+	int timeout_ms; 
 } ClientHandler;
 
 /* ======== External methods ======== */
@@ -45,7 +47,7 @@ typedef struct ClientHandler {
 int handle_read(struct pollfd* fd, void* buf, size_t nbyte);
 
 /* Create a new client handler at specified port */
-ClientHandler create_client_handler(int portno);
+ClientHandler create_client_handler(int portno, int timeout_ms);
 
 /* Poll clients and accept new connections */
 void handle_connections(ClientHandler* handler);

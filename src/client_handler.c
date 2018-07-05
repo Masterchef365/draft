@@ -1,8 +1,9 @@
 #include <client_handler.h>
 
-ClientHandler create_client_handler(int portno) {
+ClientHandler create_client_handler(int portno, int timeout_ms) {
 	ClientHandler handler;
 	bzero((char *) &handler.clients, sizeof(handler.clients));
+	handler.timeout_ms = timeout_ms;
 
 	/* Set up server structs */
 	bzero((char *) &handler.serv_addr, sizeof(handler.serv_addr));
@@ -64,7 +65,7 @@ int handle_read(struct pollfd* fd, void* buf, size_t nbyte) {
 
 void handle_connections(ClientHandler* handler) {
 	/* Poll socket to determine if connections have activity */
-	poll((struct pollfd*)&handler->clients, 2, 20); /* TODO: configurable timeout period */
+	poll((struct pollfd*)&handler->clients, 2, handler->timeout_ms); /* TODO: configurable timeout period */
 
 	/* Invalidate each hungup connection */
 #define CLIENT(NAME) invalidate_if_hungup(&handler->clients.NAME);
