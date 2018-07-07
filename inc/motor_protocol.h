@@ -5,8 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-/* Don't actually send anything */
-#define DEBUG 1
+#define DEBUG_I2C 1
 
 #define VARS() \
 	VAR(set_target) \
@@ -17,19 +16,13 @@
 	VAR(set_enable) \
 
 #define VAR(NAME) NAME,
-typedef enum VarId {
-	VARS()
-} VarId;
+typedef enum VarId { VARS() } VarId;
 #undef VAR
 
-#if DEBUG
-#define VAR(NAME) #NAME,
-const char* string_names[] = {
-	VARS()
-};
-#undef VAR
+#if DEBUG_I2C
+extern const char* string_names[];
 #endif
 
-void send_var(int fd, VarId id, float value);
+void motor_send_var(int fd, VarId id, float value);
 
 #endif

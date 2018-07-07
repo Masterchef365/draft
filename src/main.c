@@ -31,10 +31,26 @@ int main(int argc, char **argv) {
 	motor_write_config(stdout, &gantry_config.config);
 	server_write_config(stdout, &server_config.config);
 
-	ClientHandler handler = create_client_handler(
-			server_config.config.portno, server_config.config.timeout_ms);
+	/*
+	int device;
+	char *filename = "/dev/i2c-1";
+	if ((device = open(filename, O_RDWR)) < 0) {
+		perror("Failed to open the i2c bus");
+		exit(1);
+	}
+	int addr = 0x04;
+	if (ioctl(device, I2C_SLAVE, addr) < 0) {
+		perror("Failed to acquire bus access and/or talk to slave");
+		exit(1);
+	}
+	*/
 
-	close_server(&handler);
+	motor_send_var(0, set_position, 0.0);
+
+	//ClientHandler handler = create_client_handler(
+	//server_config.config.portno, server_config.config.timeout_ms);
+
+	//close_server(&handler);
 	motor_config_manager_close_and_rewrite(&gantry_config);
 	server_config_manager_close_and_rewrite(&server_config);
 }
