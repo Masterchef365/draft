@@ -65,7 +65,7 @@ int handle_read(struct pollfd* fd, void* buf, size_t nbyte) {
 
 void handle_connections(ClientHandler* handler) {
 	/* Poll socket to determine if connections have activity */
-	poll((struct pollfd*)&handler->clients, 2, handler->timeout_ms); /* TODO: configurable timeout period */
+	poll((struct pollfd*)&handler->clients, 2, handler->timeout_ms);
 
 	/* Invalidate each hungup connection */
 #define CLIENT(NAME) invalidate_if_hungup(&handler->clients.NAME);

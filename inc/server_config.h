@@ -2,14 +2,18 @@
 #define SERVER_CONFIG_H
 
 #define CONFIG_STRUCT_NAME ServerConfig
+#define CONFIG_MANAGER_STRUCT_NAME ServerConfigManager
 #define CONFIG_FUNCTION_PREFIX(NAME) server_##NAME
 #define MEMBERS() \
-	MEMBER(float, Kp, "%f") \
-	MEMBER(float, Ki, "%f") \
-	MEMBER(float, Kd, "%f") \
-	MEMBER(unsigned char, address, "0x%hhx") \
+	MEMBER(int, portno, "%i") \
+	MEMBER(int, timeout_ms, "%i") \
 
 #include <make_config.h>
+#include <make_config_manager.h>
+
+#undef CONFIG_STRUCT_NAME
+#undef CONFIG_FUNCTION_PREFIX
+#undef CONFIG_MANAGER_STRUCT_NAME
 #undef MEMBERS
 
 #endif

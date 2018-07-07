@@ -22,6 +22,9 @@
 	CLIENT(joystick) \
 	CLIENT(vision) \
 
+/* TODO: Move client names out of the implementation, 
+ * move all functions into a header file */
+
 /* Polling file descriptor mapping table (unique names 
  * for each pollfd defined in the CLIENTS() macro */
 #define CLIENT(NAME) struct pollfd NAME;
