@@ -11,8 +11,8 @@
 #include <netdb.h> 
 #include <poll.h>
 #include <fcntl.h>
-
-#include <fail.h>
+#include <errno.h>
+#include <stdio.h>
 
 /* Buffer length for incoming ID messages */
 #define ID_BUF_LEN 64

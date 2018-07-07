@@ -94,7 +94,3 @@ void CONFIG_FUNCTION_PREFIX(write_config) (FILE* file, CONFIG_STRUCT_NAME * conf
 		MEMBERS();
 #undef MEMBER
 }
-
-#undef MEMBERS
-#undef CONFIG_STRUCT_NAME
-#undef CONFIG_FUNCTION_PREFIX

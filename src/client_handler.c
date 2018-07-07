@@ -20,11 +20,11 @@ ClientHandler create_client_handler(int portno, int timeout_ms) {
 	/* Reuse server port. When exited incorrectly, the server can leave behind some data. */
 	int tmp;
 	if (setsockopt(handler.server_sockfd, SOL_SOCKET, SO_REUSEADDR, &tmp, sizeof(tmp)) < 0)
-		fail("reusing server socket");
+		perror("reusing server socket");
 
 	/* Bind the server socket to the address */
 	if (bind(handler.server_sockfd, (struct sockaddr *) &handler.serv_addr, sizeof(handler.serv_addr)) < 0)
-		fail("binding server socket");
+		perror("binding server socket");
 
 	/* Set all existing file descriptors to -1 (invalid, will be skipped in polling) */
 #define CLIENT(NAME) handler.clients.NAME.fd = -1;
