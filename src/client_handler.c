@@ -52,7 +52,7 @@ int invalidate_if_hungup (struct pollfd* fd) {
 }
 
 void assign_new_client(struct pollfd* fd_named, int fd_new) {
-	fd_named->events = POLLIN | POLLOUT | POLLHUP;
+	fd_named->events = POLLIN | POLLHUP; /* | POLLOUT */
 	fd_named->fd = fd_new;
 }
 
@@ -76,7 +76,8 @@ int handle_read(struct pollfd* fd, void* buf, size_t nbyte) {
 }
 
 int handle_write(struct pollfd* fd, void* buf, size_t nbyte) {
-	if (fd->revents & POLLOUT && fd->fd != -1) {
+	if (fd->fd != -1) {
+	/* if (fd->revents & POLLOUT && fd->fd != -1) { */
 		int nwrite = write(fd->fd, buf, nbyte);
 		if (nwrite <= 0) {
 			handle_remove(fd);
@@ -112,7 +113,7 @@ void handle_connections(ClientHandler* handler) {
 #undef CLIENT
 		if (!did_assign) {
 			close(client_sockfd);
-			fprintf(stderr, "Removed unrecognized client: %s", id_buf);
+			fprintf(stderr, "Removed unrecognized client: %s\n", id_buf);
 		}
 	}
 }

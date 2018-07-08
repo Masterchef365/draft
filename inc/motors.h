@@ -16,6 +16,7 @@
 	VAR(ki) \
 	VAR(kd) \
 	VAR(mode) \
+	VAR(home) \
 	VAR(enable) \
 
 #define MOTORS() \
@@ -40,15 +41,6 @@ typedef enum MotorVarNum {
 	MOTOR_VARS()
 } MotorVarNum;
 #undef VAR
-
-/*
-#define VAR(NAME) #NAME,
-const char* motor_var_name_strings[] = {
-	"none",
-	MOTOR_VARS()
-};
-#undef VAR
-*/
 
 /* Send a variable to a motor over I2C */
 extern void motor_send_var(Motor* motor, MotorVarNum id, float value);

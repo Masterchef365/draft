@@ -43,51 +43,42 @@ int main(int argc, char** argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	/*
-	for (int i = 0; i < motor_array_length(); i++) {
-		Motor* motor = &((Motor*)&motors)[i];
-		printf("=== %s === \n", motor->name);
-		motor_write_config(stdout, &motor->config); 
-	}
-	*/
-
-	/*
-	putchar('\n');
-	char in_buf[1000];
-	char out_buf[1000];
-	bzero(&out_buf, 1000);
-	do {
-		printf("%s", out_buf);
-		printf("> ");
-		fgets(in_buf, 1000, stdin);
-		in_buf[strlen(in_buf) - 1] = '\0';
-	} while (command_line_logic(in_buf, out_buf, 1000, &motors));
-	*/
-
 	ClientHandler handler = create_client_handler(server_config.portno, server_config.timeout_ms);
 
 	int run_app = 1;
-	char in_buf[1000];
-	char out_buf[1000];
-	bzero(in_buf, 1000);
+	const size_t cmd_buf_len = 1024;
+	char cmd_in_buf[cmd_buf_len];
+	char cmd_out_buf[cmd_buf_len];
+	bzero(cmd_in_buf, cmd_buf_len);
 	enum CommandLineState {
 		cmd_idle, cmd_disconnected, cmd_wait_send
 	} cmd_state = cmd_disconnected;
 
+	char joystick_buf[64];
 	do {
 		handle_connections(&handler);
 
 		if (cmd_state == cmd_disconnected && handler.clients.cmd.fd != -1) {
-			snprintf(out_buf, 1000, "BroccoliBot motor server v0.1\n> ");
+			snprintf(cmd_out_buf, cmd_buf_len, "BroccoliBot motor server v0.1\n> ");
 			cmd_state = cmd_wait_send;
 		}
 		if (cmd_state != cmd_disconnected && handler.clients.cmd.fd == -1) cmd_state = cmd_disconnected;
-		if (cmd_state == cmd_wait_send && handle_write(&handler.clients.cmd, out_buf, strlen(out_buf))) cmd_state = cmd_idle;
-		if (cmd_state == cmd_idle && handle_read(&handler.clients.cmd, in_buf, 512)) {
-			in_buf[strlen(in_buf) - 1] = '\0'; /* Remove trailing newline */
-			run_app = command_line_logic(in_buf, out_buf, 1000, &motors);
+		if (cmd_state == cmd_wait_send && handle_write(&handler.clients.cmd, cmd_out_buf, strlen(cmd_out_buf))) cmd_state = cmd_idle;
+		if (cmd_state == cmd_idle && handle_read(&handler.clients.cmd, cmd_in_buf, cmd_buf_len)) {
+			cmd_in_buf[strlen(cmd_in_buf) - 1] = '\0'; /* Remove trailing newline */
+			run_app = command_line_logic(cmd_in_buf, cmd_out_buf, cmd_buf_len, &motors);
 			cmd_state = cmd_wait_send;
-			bzero(in_buf, 1000);
+			bzero(cmd_in_buf, cmd_buf_len);
+		}
+
+		if (handle_read(&handler.clients.joystick, joystick_buf, 64)) {
+			char type_buf[32];
+			int idx, value;
+			if (sscanf(joystick_buf, "%s %i %i\n", type_buf, &idx, &value) == 3) {
+				if (strcmp(type_buf, "axs") == 0) {
+					if (idx == 1) motor_send_var(&motors.forward, motor_num_target, (float)value);
+				}
+			}
 		}
 	} while(run_app);
 	hander_close(&handler);	
