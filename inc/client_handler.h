@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /* Buffer length for incoming ID messages */
 #define ID_BUF_LEN 64
@@ -21,6 +22,7 @@
 #define CLIENTS() \
 	CLIENT(joystick) \
 	CLIENT(vision) \
+	CLIENT(cmd) \
 
 /* TODO: Move client names out of the implementation, 
  * move all functions into a header file */
@@ -46,8 +48,14 @@ typedef struct ClientHandler {
 } ClientHandler;
 
 /* ======== External methods ======== */
-/* Handle disconnect on read */
+/* Handle disconnect on read and nonexistant connection */
 int handle_read(struct pollfd* fd, void* buf, size_t nbyte);
+
+/* Handle disconnect on write and nonexistant connection */
+int handle_write(struct pollfd* fd, void* buf, size_t nbyte);
+
+/* Remove a client safely */
+void handle_remove(struct pollfd* fd);
 
 /* Create a new client handler at specified port */
 ClientHandler create_client_handler(int portno, int timeout_ms);

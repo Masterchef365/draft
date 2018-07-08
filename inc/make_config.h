@@ -22,6 +22,10 @@
 
 #ifndef MAKE_CONFIG_H
 #define MAKE_CONFIG_H
+
+#include <string.h>
+#include <errno.h>
+
 /* Convert a string into a unique hash */
 unsigned int str_hash(char* str) {
 	unsigned int hash = 7890;

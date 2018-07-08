@@ -19,12 +19,16 @@ ClientHandler create_client_handler(int portno, int timeout_ms) {
 
 	/* Reuse server port. When exited incorrectly, the server can leave behind some data. */
 	int tmp;
-	if (setsockopt(handler.server_sockfd, SOL_SOCKET, SO_REUSEADDR, &tmp, sizeof(tmp)) < 0)
+	if (setsockopt(handler.server_sockfd, SOL_SOCKET, SO_REUSEADDR, &tmp, sizeof(tmp)) < 0) {
 		perror("reusing server socket");
+		exit(EXIT_FAILURE);
+	}
 
 	/* Bind the server socket to the address */
-	if (bind(handler.server_sockfd, (struct sockaddr *) &handler.serv_addr, sizeof(handler.serv_addr)) < 0)
+	if (bind(handler.server_sockfd, (struct sockaddr *) &handler.serv_addr, sizeof(handler.serv_addr)) < 0) {
 		perror("binding server socket");
+		exit(EXIT_FAILURE);
+	}
 
 	/* Set all existing file descriptors to -1 (invalid, will be skipped in polling) */
 #define CLIENT(NAME) handler.clients.NAME.fd = -1;
@@ -48,24 +52,46 @@ int invalidate_if_hungup (struct pollfd* fd) {
 }
 
 void assign_new_client(struct pollfd* fd_named, int fd_new) {
-	fd_named->events = POLLIN | POLLHUP;
+	fd_named->events = POLLIN | POLLOUT | POLLHUP;
 	fd_named->fd = fd_new;
 }
 
+void handle_remove(struct pollfd* fd) {
+	close(fd->fd);
+	fd->fd = -1;
+}
+
 int handle_read(struct pollfd* fd, void* buf, size_t nbyte) {
-	int nread = read(fd->fd, buf, nbyte);
-	if (nread <= 0) {
-		close(fd->fd);
-		fd->fd = -1;
-		return 0;
+	if (fd->revents & POLLIN && fd->fd != -1) {
+		int nread = read(fd->fd, buf, nbyte);
+		if (nread <= 0) {
+			handle_remove(fd);
+			return 0;
+		} else {
+			return nread;
+		}
 	} else {
-		return nread;
+		return 0;
+	}
+}
+
+int handle_write(struct pollfd* fd, void* buf, size_t nbyte) {
+	if (fd->revents & POLLOUT && fd->fd != -1) {
+		int nwrite = write(fd->fd, buf, nbyte);
+		if (nwrite <= 0) {
+			handle_remove(fd);
+			return 0;
+		} else {
+			return nwrite;
+		}
+	} else {
+		return 0;
 	}
 }
 
 void handle_connections(ClientHandler* handler) {
 	/* Poll socket to determine if connections have activity */
-	poll((struct pollfd*)&handler->clients, 2, handler->timeout_ms);
+	poll((struct pollfd*)&handler->clients, sizeof(ClientFds) / sizeof(struct pollfd), handler->timeout_ms);
 
 	/* Invalidate each hungup connection */
 #define CLIENT(NAME) invalidate_if_hungup(&handler->clients.NAME);
@@ -80,7 +106,7 @@ void handle_connections(ClientHandler* handler) {
 		char id_buf[ID_BUF_LEN];
 		bzero(&id_buf, ID_BUF_LEN);
 		read(client_sockfd, id_buf, ID_BUF_LEN);
-#define CLIENT(NAME) if (strncmp(id_buf, "id:" #NAME, ID_BUF_LEN) == 0) assign_new_client(&handler->clients.NAME, client_sockfd);
+#define CLIENT(NAME) if (strncmp(id_buf, "id:" #NAME "\n", ID_BUF_LEN) == 0) assign_new_client(&handler->clients.NAME, client_sockfd);
 		CLIENTS()
 #undef CLIENT
 	}
