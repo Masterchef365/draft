@@ -20,4 +20,7 @@ int get_first_i2c_fd ();
  * a FILE pointer to the resulting file */
 FILE* file_ptr_config_file (char* dir, char* name, char* modes);
 
+/* Convert a string into a unique hash */
+unsigned int str_hash(char* str);
+
 #endif

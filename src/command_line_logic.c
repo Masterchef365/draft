@@ -29,9 +29,9 @@ int command_line_logic(int print_fd, char* message, MotorArray* array) {
 			MotorVarNum id;
 			if (!param_name || !(id = motor_match_var_string(param_name))) {
 				dprintf(print_fd, "Parameter must be one of the following:\n");
-				for (int i = 0; i < sizeof(motor_var_name_strings) / sizeof(char*); i++) {
-					dprintf(print_fd, "%s, ", motor_var_name_strings[i]);
-				}
+#define VAR(NAME) dprintf(print_fd, "%s, ", #NAME);
+				MOTOR_VARS()
+#undef VAR
 				dprintf(print_fd, "\n");
 			} else {
 				char* param_value = strtok(NULL, " ");

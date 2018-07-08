@@ -9,7 +9,6 @@
 	MEMBER(int, timeout_ms, "%i") \
 
 #include <make_config.h>
-#include <make_config_manager.h>
 
 #undef CONFIG_STRUCT_NAME
 #undef CONFIG_FUNCTION_PREFIX

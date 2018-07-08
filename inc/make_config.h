@@ -23,17 +23,10 @@
 #ifndef MAKE_CONFIG_H
 #define MAKE_CONFIG_H
 
+#include <stdio.h>
 #include <string.h>
+#include <util.h>
 #include <errno.h>
-
-/* Convert a string into a unique hash */
-unsigned int str_hash(char* str) {
-	unsigned int hash = 7890;
-	int c;
-	while ((c = *str++)) hash += (hash << 5) + c;
-	return hash;
-}
-#endif
 
 /* Create the members of the configuration storage struct 
  * (named CONFIG_STRUCT_NAME) using the MEMBERS() macro */
@@ -54,47 +47,22 @@ typedef struct CONFIG_FUNCTION_PREFIX(hash_cache) {
 /* Create the function <prefix>_create_hash_cache(),
  * instantiates an isntance of the <prefix>_hash_cache struct 
  * and populates it with the hashes of all of the variable names */
-CONFIG_FUNCTION_PREFIX(hash_cache) CONFIG_FUNCTION_PREFIX(create_hash_cache) () {
-	CONFIG_FUNCTION_PREFIX(hash_cache) cache;
-#define MEMBER(TYPE, NAME, FORMAT) cache.NAME##_hash = str_hash(#NAME);
-	MEMBERS();
-#undef MEMBER
-	return cache;
-}
+extern CONFIG_FUNCTION_PREFIX(hash_cache) CONFIG_FUNCTION_PREFIX(create_hash_cache) ();
 
 /* Create the function <prefix>_parse_config() which 
  * creates an instance of the Config struct (named CONFIG_STRUCT_NAME)
  * given a file pointer to parse the config from. */
-CONFIG_STRUCT_NAME CONFIG_FUNCTION_PREFIX(parse_config) (FILE* file) {
-	char key_buf[64];
-	char value_buf[64];
-
-	CONFIG_FUNCTION_PREFIX(hash_cache) cache = CONFIG_FUNCTION_PREFIX(create_hash_cache) ();
-
-	CONFIG_STRUCT_NAME conf;
-
-	bzero(&conf, sizeof(conf));
-	bzero(key_buf, sizeof(key_buf));
-	bzero(value_buf, sizeof(value_buf));
-
-	while (fscanf(file, "%s = %s\n", key_buf, value_buf) > 0) {
-		unsigned int key_hash = str_hash (key_buf);
-
-#define MEMBER(TYPE, NAME, FORMAT) if (cache.NAME##_hash == key_hash) sscanf(value_buf, FORMAT, &conf.NAME);
-		MEMBERS();
-#undef MEMBER
-
-		bzero(key_buf, sizeof(key_buf));
-		bzero(value_buf, sizeof(value_buf));
-	}
-	return conf;
-}
+extern CONFIG_STRUCT_NAME CONFIG_FUNCTION_PREFIX(parse_config) (FILE* file);
 
 /* Create the function <prefix>_write_config() which will create
  * a parseable and human readable config file from an existing config
  * structure. */
-void CONFIG_FUNCTION_PREFIX(write_config) (FILE* file, CONFIG_STRUCT_NAME * conf) {
-#define MEMBER(TYPE, NAME, FORMAT) fprintf(file, "%s = " FORMAT "\n", #NAME, conf->NAME);
-		MEMBERS();
-#undef MEMBER
-}
+extern void CONFIG_FUNCTION_PREFIX(write_config) (FILE* file, CONFIG_STRUCT_NAME * conf);
+
+/* Should only be included with this macro once per project in a 
+ * *_config.c file, creates the actual implementations */ 
+#ifdef MAKE_IMPL
+#include <make_config_impl.h>
+#endif
+
+#endif
