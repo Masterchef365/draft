@@ -38,3 +38,10 @@ void CONFIG_FUNCTION_PREFIX(write_config) (FILE* file, CONFIG_STRUCT_NAME * conf
 		MEMBERS();
 #undef MEMBER
 }
+
+char* CONFIG_FUNCTION_PREFIX(write_config_str) (char* output_str, CONFIG_STRUCT_NAME * conf) {
+#define MEMBER(TYPE, NAME, FORMAT) output_str += sprintf(output_str, "%s = " FORMAT "\n", #NAME, conf->NAME);
+		MEMBERS();
+#undef MEMBER
+		return output_str;
+}

@@ -56,6 +56,9 @@ extern CONFIG_STRUCT_NAME CONFIG_FUNCTION_PREFIX(parse_config) (FILE* file);
  * structure. */
 extern void CONFIG_FUNCTION_PREFIX(write_config) (FILE* file, CONFIG_STRUCT_NAME * conf);
 
+/* The same thing but write to a string instead */
+extern char* CONFIG_FUNCTION_PREFIX(write_config_str) (char* output_str, CONFIG_STRUCT_NAME * conf);
+
 /* Should only be included with this macro once per project in a 
  * *_config.c file, creates the actual implementations */ 
 #ifdef MAKE_IMPL

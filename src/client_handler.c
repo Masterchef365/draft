@@ -106,9 +106,14 @@ void handle_connections(ClientHandler* handler) {
 		char id_buf[ID_BUF_LEN];
 		bzero(&id_buf, ID_BUF_LEN);
 		read(client_sockfd, id_buf, ID_BUF_LEN);
-#define CLIENT(NAME) if (strncmp(id_buf, "id:" #NAME "\n", ID_BUF_LEN) == 0) assign_new_client(&handler->clients.NAME, client_sockfd);
-		CLIENTS()
+		int did_assign = 0;
+#define CLIENT(NAME) if (strncmp(id_buf, "id:" #NAME "\n", ID_BUF_LEN) == 0) { assign_new_client(&handler->clients.NAME, client_sockfd); did_assign = 1; }
+		CLIENTS();
 #undef CLIENT
+		if (!did_assign) {
+			close(client_sockfd);
+			fprintf(stderr, "Removed unrecognized client: %s", id_buf);
+		}
 	}
 }
 

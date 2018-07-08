@@ -11,12 +11,12 @@ int command_line_logic(char* input_str, char* output_str, size_t buf_len, MotorA
 		if (!dev_name) {
 			for (int i = 0; i < motor_array_length(); i++) {
 				select = &((Motor*)array)[i];
-				output_str += snprintf(output_str, buf_len, "%s%10s 0x%hhx\n", output_str, select->name, select->config.address);
+				output_str += snprintf(output_str, buf_len, "%10s 0x%hhx\n", select->name, select->config.address);
 			}
 		} else if (!(select = motor_match_string(array, dev_name))) {
 			output_str += snprintf(output_str, buf_len, "Unrecognized device name or address '%s' \n", dev_name);
 		} else {
-			motor_write_config(stdout, &select->config);
+			output_str = motor_write_config_str(output_str, &select->config);
 		}
 	} else if (strcmp(command, "set") == 0) {
 		Motor* select;
@@ -49,10 +49,11 @@ int command_line_logic(char* input_str, char* output_str, size_t buf_len, MotorA
 		}
 	} else if (strcmp(command, "clear") == 0) {
 		output_str += snprintf(output_str, buf_len, "\e[3J\e[H\e[2J");
-	} else if (strcmp(command, "q") == 0) {
+	} else if (strcmp(command, "stop") == 0) {
 		return 0;
 	} else {
 		output_str += snprintf(output_str, buf_len, "Unrecognized command '%s' \n", command);
 	}
+	output_str += snprintf(output_str, buf_len, "\n> ");
 	return 1;
 }
