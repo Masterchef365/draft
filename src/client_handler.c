@@ -112,7 +112,7 @@ void handle_connections(ClientHandler* handler) {
 	}
 }
 
-void close_server(ClientHandler* handler) {
+void hander_close(ClientHandler* handler) {
 	/* For each client, close the fd if it's valid */
 #define CLIENT(NAME) if (handler->clients.NAME.fd != -1) close (handler->clients.NAME.fd);
 	CLIENTS();

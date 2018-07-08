@@ -1,19 +1,20 @@
 #include <command_line_logic.h>
 
-int command_line_logic(int print_fd, char* message, MotorArray* array) {
-	char* command = strtok(message, " ");
+int command_line_logic(char* input_str, char* output_str, size_t buf_len, MotorArray* array) {
+	bzero(output_str, buf_len);
+	char* command = strtok(input_str, " ");
 	if (command == NULL) {
-		dprintf(print_fd, "Expected command \n");
+		output_str += snprintf(output_str, buf_len, "Expected command \n");
 	} else if (strcmp(command, "ls") == 0) {
 		char* dev_name = strtok(NULL, " ");
 		Motor* select;
 		if (!dev_name) {
 			for (int i = 0; i < motor_array_length(); i++) {
 				select = &((Motor*)array)[i];
-				dprintf(print_fd, "%10s 0x%hhx\n", select->name, select->config.address);
+				output_str += snprintf(output_str, buf_len, "%s%10s 0x%hhx\n", output_str, select->name, select->config.address);
 			}
 		} else if (!(select = motor_match_string(array, dev_name))) {
-			dprintf(print_fd, "Unrecognized device name or address '%s' \n", dev_name);
+			output_str += snprintf(output_str, buf_len, "Unrecognized device name or address '%s' \n", dev_name);
 		} else {
 			motor_write_config(stdout, &select->config);
 		}
@@ -21,37 +22,37 @@ int command_line_logic(int print_fd, char* message, MotorArray* array) {
 		Motor* select;
 		char* dev_name = strtok(NULL, " ");
 		if (!dev_name) {
-			dprintf(print_fd, "Missing device name. \n");
+			output_str += snprintf(output_str, buf_len, "Missing device name. \n");
 		} else if (!(select = motor_match_string(array, dev_name))) {
-			dprintf(print_fd, "Unrecognized device name or address '%s' \n", dev_name);
+			output_str += snprintf(output_str, buf_len, "Unrecognized device name or address '%s' \n", dev_name);
 		} else {
 			char* param_name = strtok(NULL, " ");
 			MotorVarNum id;
 			if (!param_name || !(id = motor_match_var_string(param_name))) {
-				dprintf(print_fd, "Parameter must be one of the following:\n");
-#define VAR(NAME) dprintf(print_fd, "%s, ", #NAME);
+				output_str += snprintf(output_str, buf_len, "Parameter must be one of the following:\n");
+#define VAR(NAME) output_str += snprintf(output_str, buf_len, "%s, ", #NAME);
 				MOTOR_VARS()
 #undef VAR
-				dprintf(print_fd, "\n");
+				output_str += snprintf(output_str, buf_len, "\n");
 			} else {
 				char* param_value = strtok(NULL, " ");
 				float value;
 				if (!param_value) {
-					dprintf(print_fd, "Missing value. \n");
+					output_str += snprintf(output_str, buf_len, "Missing value. \n");
 				} else if (sscanf(param_value, "%f", &value) != 1) {
-					dprintf(print_fd, "Failed to parse %s as float \n", param_value);
+					output_str += snprintf(output_str, buf_len, "Failed to parse %s as float \n", param_value);
 				} else {
 					motor_send_var(select, id, value);
-					dprintf(print_fd, "Sent!\n");
+					output_str += snprintf(output_str, buf_len, "Sent!\n");
 				}
 			}
 		}
 	} else if (strcmp(command, "clear") == 0) {
-		dprintf(print_fd, "\e[3J\e[H\e[2J");
+		output_str += snprintf(output_str, buf_len, "\e[3J\e[H\e[2J");
 	} else if (strcmp(command, "q") == 0) {
 		return 0;
 	} else {
-		dprintf(print_fd, "Unrecognized command '%s' \n", command);
+		output_str += snprintf(output_str, buf_len, "Unrecognized command '%s' \n", command);
 	}
 	return 1;
 }

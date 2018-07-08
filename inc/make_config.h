@@ -20,9 +20,6 @@
  * motor_write_config(config_file, &conf);
  */
 
-#ifndef MAKE_CONFIG_H
-#define MAKE_CONFIG_H
-
 #include <stdio.h>
 #include <string.h>
 #include <util.h>
@@ -63,6 +60,4 @@ extern void CONFIG_FUNCTION_PREFIX(write_config) (FILE* file, CONFIG_STRUCT_NAME
  * *_config.c file, creates the actual implementations */ 
 #ifdef MAKE_IMPL
 #include <make_config_impl.h>
-#endif
-
 #endif

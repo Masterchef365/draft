@@ -97,7 +97,7 @@ int motor_rewrite_to_config_file(char* dir, char* name, Motor* motor) {
 		fclose(file_ptr);
 		return 1;
 	} else {
-
+		return 0;
 	}
 }
 

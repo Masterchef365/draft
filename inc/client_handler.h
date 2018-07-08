@@ -64,7 +64,7 @@ ClientHandler create_client_handler(int portno, int timeout_ms);
 void handle_connections(ClientHandler* handler);
 
 /* Desconstruct a client handler safely */
-void close_server(ClientHandler* handler);
+void hander_close(ClientHandler* handler);
 
 /* ======== Internal methods ======== */
 /* Close a socket and set it to -1 if it received POLLHUP */
