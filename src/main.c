@@ -3,6 +3,62 @@
 #include <motors.h>
 #include <util.h>
 
+int command_line_logic(int print_fd, char* message, MotorArray* array) {
+	char* command = strtok(message, " ");
+	if (command == NULL) {
+		dprintf(print_fd, "Expected command \n");
+	} else if (strcmp(command, "ls") == 0) {
+		char* dev_name = strtok(NULL, " ");
+		Motor* select;
+		if (!dev_name) {
+			for (int i = 0; i < motor_array_length(); i++) {
+				select = &((Motor*)array)[i];
+				dprintf(print_fd, "%10s 0x%hhx\n", select->name, select->config.address);
+			}
+		} else if (!(select = motor_match_string(array, dev_name))) {
+			dprintf(print_fd, "Unrecognized device name or address '%s' \n", dev_name);
+		} else {
+			motor_write_config(stdout, &select->config);
+		}
+	} else if (strcmp(command, "set") == 0) {
+		Motor* select;
+		char* dev_name = strtok(NULL, " ");
+		if (!dev_name) {
+			dprintf(print_fd, "Missing device name. \n");
+		} else if (!(select = motor_match_string(array, dev_name))) {
+			dprintf(print_fd, "Unrecognized device name or address '%s' \n", dev_name);
+		} else {
+			char* param_name = strtok(NULL, " ");
+			MotorVarNum id;
+			if (!param_name || !(id = motor_match_var_string(param_name))) {
+				dprintf(print_fd, "Parameter must be one of the following:\n");
+				for (int i = 0; i < sizeof(motor_var_name_strings) / sizeof(char*); i++) {
+					dprintf(print_fd, "%s, ", motor_var_name_strings[i]);
+				}
+				dprintf(print_fd, "\n");
+			} else {
+				char* param_value = strtok(NULL, " ");
+				float value;
+				if (!param_value) {
+					dprintf(print_fd, "Missing value. \n");
+				} else if (sscanf(param_value, "%f", &value) != 1) {
+					dprintf(print_fd, "Failed to parse %s as float \n", param_value);
+				} else {
+					motor_send_var(select, id, value);
+					dprintf(print_fd, "Sent!\n");
+				}
+			}
+		}
+	} else if (strcmp(command, "clear") == 0) {
+		dprintf(print_fd, "\e[3J\e[H\e[2J");
+	} else if (strcmp(command, "q") == 0) {
+		return 0;
+	} else {
+		dprintf(print_fd, "Unrecognized command '%s' \n", command);
+	}
+	return 1;
+}
+
 int main(int argc, char **argv) {
 	/* Warn user of incorrect usage and exit */
 	if (argc < 2) {
@@ -33,70 +89,11 @@ int main(int argc, char **argv) {
 
 	putchar('\n');
 	char buf[256];
-	int listen = 1;
 	do {
 		printf("> ");
 		fgets(buf, 256, stdin);
 		buf[strlen(buf) - 1] = '\0';
-		char* command = strtok(buf, " ");
-		if (command == NULL) {
-			fprintf(stderr, "Expected command \n");
-		} else if (strcmp(command, "ls") == 0) {
-			char* dev_name = strtok(NULL, " ");
-			Motor* select;
-			if (!dev_name) {
-				for (int i = 0; i < motor_array_length(); i++) {
-					select = &((Motor*)&array)[i];
-					printf("%10s 0x%hhx\n", select->name, select->config.address);
-				}
-			} else if (!(select = motor_match_string(&array, dev_name))) {
-				fprintf(stderr, "Unrecognized device name or address '%s' \n", dev_name);
-			} else {
-				motor_write_config(stdout, &select->config);
-			}
-		} else if (strcmp(command, "set") == 0) {
-			Motor* select;
-			char* dev_name = strtok(NULL, " ");
-			if (!dev_name) {
-				fprintf(stderr, "Missing device name. \n");
-			} else if (!(select = motor_match_string(&array, dev_name))) {
-				fprintf(stderr, "Unrecognized device name or address '%s' \n", dev_name);
-			} else {
-				char* param_name = strtok(NULL, " ");
-				MotorVarNum id;
-				if (!param_name || !(id = motor_match_var_string(param_name))) {
-					printf("Parameter must be one of the following:\n");
-					for (int i = 0; i < sizeof(motor_var_name_strings) / sizeof(char*); i++) {
-						printf("%s, ", motor_var_name_strings[i]);
-					}
-					putchar('\n');
-				} else {
-					char* param_value = strtok(NULL, " ");
-					float value;
-					if (!param_value) {
-						fprintf(stderr, "Missing value. \n");
-					} else if (sscanf(param_value, "%f", &value) != 1) {
-						fprintf(stderr, "Failed to parse %s as float \n", param_value);
-					} else {
-						motor_send_var(select, id, value);
-						switch (id) {
-							case motor_num_kp: select->config.Kp = value; break;
-							case motor_num_ki: select->config.Ki = value; break;
-							case motor_num_kd: select->config.Kd = value; break;
-							default: break;
-						}
-						printf("Sent!\n");
-					}
-				}
-			}
-		} else if (strcmp(command, "clear") == 0) {
-			printf("\e[3J\e[H\e[2J");
-		} else if (strcmp(command, "q") == 0) {
-			listen = 0;
-		} else {
-			fprintf(stderr, "Unrecognized command '%s' \n", command);
-		}
-	} while (listen);
+	} while (command_line_logic(STDOUT_FILENO, buf, &array));
 
 	motor_array_rewrite_config_dir(config_dir, &array);	
 }

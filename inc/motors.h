@@ -52,6 +52,14 @@ const char* motor_var_name_strings[] = {
 #if DEBUG_I2C
 void motor_send_var(Motor* motor, MotorVarNum id, float value) {
 	printf("%s: set %s = %f\n", motor->name, motor_var_name_strings[id], value);
+
+	/* TODO: Move this logic somewhere else? */
+	switch (id) {
+		case motor_num_kp: motor->config.Kp = value; break;
+		case motor_num_ki: motor->config.Ki = value; break;
+		case motor_num_kd: motor->config.Kd = value; break;
+		default: break;
+	}
 }
 #else
 void motor_send_var(Motor* motor, MotorVarNum id, float value) {
@@ -61,6 +69,14 @@ void motor_send_var(Motor* motor, MotorVarNum id, float value) {
 		read(motor->fd, &received, 1);
 		usleep(1000);
 	} while (received != (char)id);
+
+	/* TODO: Move this logic somewhere else? */
+	switch (id) {
+		case motor_num_kp: motor->config.Kp = value; break;
+		case motor_num_ki: motor->config.Ki = value; break;
+		case motor_num_kd: motor->config.Kd = value; break;
+		default: break;
+	}
 }
 #endif
 
@@ -104,7 +120,8 @@ int motor_from_config_file(int i2c_bus_fd, char* dir, char* name, Motor* motor) 
 		motor->fd = dup(i2c_bus_fd);
 		ioctl(motor->fd, I2C_SLAVE, motor->config.address);
 		strncpy(motor->name, name, DEVICE_NAME_LENGTH);
-		
+
+		/* TODO: Move this logic somewhere else? */
 		motor_send_var(motor, motor_num_kp, motor->config.Kp);
 		motor_send_var(motor, motor_num_ki, motor->config.Ki);
 		motor_send_var(motor, motor_num_kd, motor->config.Kd);
@@ -132,7 +149,7 @@ int motor_rewrite_to_config_file(char* dir, char* name, Motor* motor) {
 		fclose(file_ptr);
 		return 1;
 	} else {
-		
+
 	}
 }
 
