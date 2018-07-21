@@ -18,6 +18,8 @@ void motor_send_var(Motor* motor, MotorVarNum id, float value) {
 		case motor_num_kp: motor->config.Kp = value; break;
 		case motor_num_ki: motor->config.Ki = value; break;
 		case motor_num_kd: motor->config.Kd = value; break;
+		case motor_num_max_pwm: motor->config.max_pwm = value; break;
+		case motor_num_home_pwm: motor->config.home_pwm = value; break;
 		default: break;
 	}
 }
@@ -35,6 +37,8 @@ void motor_send_var(Motor* motor, MotorVarNum id, float value) {
 		case motor_num_kp: motor->config.Kp = value; break;
 		case motor_num_ki: motor->config.Ki = value; break;
 		case motor_num_kd: motor->config.Kd = value; break;
+		case motor_num_max_pwm: motor->config.max_pwm = value; break;
+		case motor_num_home_pwm: motor->config.home_pwm = value; break;
 		default: break;
 	}
 }
@@ -68,14 +72,21 @@ int motor_from_config_file(int i2c_bus_fd, char* dir, char* name, Motor* motor) 
 	FILE* file_ptr = file_ptr_config_file(dir, name, "r");
 	if (file_ptr) {
 		motor->config = motor_parse_config(file_ptr);
+#if !DEBUG_I2C
 		motor->fd = dup(i2c_bus_fd);
-		ioctl(motor->fd, I2C_SLAVE, motor->config.address);
+		if (ioctl(motor->fd, I2C_SLAVE, motor->config.address) == -1) {
+			fprintf(stderr, "Failed to communicate with slave address %hhx\n", motor->config.address);
+			return 0;
+		}
+#endif
 		strncpy(motor->name, name, DEVICE_NAME_LENGTH);
 
 		/* TODO: Move this logic somewhere else? */
 		motor_send_var(motor, motor_num_kp, motor->config.Kp);
 		motor_send_var(motor, motor_num_ki, motor->config.Ki);
 		motor_send_var(motor, motor_num_kd, motor->config.Kd);
+		motor_send_var(motor, motor_num_max_pwm, motor->config.max_pwm);
+		motor_send_var(motor, motor_num_home_pwm, motor->config.home_pwm);
 
 		fclose(file_ptr);
 		return 1;

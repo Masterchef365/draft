@@ -49,7 +49,12 @@ int command_line_logic(char* input_str, char* output_str, size_t buf_len, MotorA
 		}
 	} else if (strcmp(command, "clear") == 0) {
 		output_str += snprintf(output_str, buf_len, "\e[3J\e[H\e[2J");
+	} else if (strcmp(command, "enable") == 0 || strcmp(command, "e") == 0) {
+		for (int i = 0; i < motor_array_length(); i++) motor_send_var(&((Motor*)array)[i], motor_num_enable, 1);
+	} else if (strcmp(command, "disable") == 0 || strcmp(command, "d") == 0) {
+		for (int i = 0; i < motor_array_length(); i++) motor_send_var(&((Motor*)array)[i], motor_num_enable, 0);
 	} else if (strcmp(command, "stop") == 0) {
+		for (int i = 0; i < motor_array_length(); i++) motor_send_var(&((Motor*)array)[i], motor_num_enable, 0);
 		return 0;
 	} else {
 		output_str += snprintf(output_str, buf_len, "Unrecognized command '%s' \n", command);

@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
 	/* Load motor configs from directory */
 	MotorArray motors;
 	if (!motor_array_from_config_dir(i2c_bus_fd, config_dir, &motors)) {
-		fprintf(stderr, "Failure opening one or more config files. Exiting.\n");
+		fprintf(stderr, "Failed to initialize one or more motors. Exiting.\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -55,6 +55,8 @@ int main(int argc, char** argv) {
 	} cmd_state = cmd_disconnected;
 
 	char joystick_buf[64];
+	char vision_buf[64];
+
 	do {
 		handle_connections(&handler);
 
@@ -76,8 +78,15 @@ int main(int argc, char** argv) {
 			int idx, value;
 			if (sscanf(joystick_buf, "%s %i %i\n", type_buf, &idx, &value) == 3) {
 				if (strcmp(type_buf, "axs") == 0) {
-					if (idx == 1) motor_send_var(&motors.forward, motor_num_target, (float)value);
+					if (idx == 1) motor_send_var(&motors.gantry, motor_num_target, (float)value);
 				}
+			}
+		}
+
+		if (handle_read(&handler.clients.vision, vision_buf, 64)) {
+			int value;
+			if (sscanf(vision_buf, "%i\n", &value) == 1) {
+				motor_send_var(&motors.gantry, motor_num_target, (float)value);
 			}
 		}
 	} while(run_app);

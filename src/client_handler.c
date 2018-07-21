@@ -114,6 +114,8 @@ void handle_connections(ClientHandler* handler) {
 		if (!did_assign) {
 			close(client_sockfd);
 			fprintf(stderr, "Removed unrecognized client: %s\n", id_buf);
+		} else {
+			if (errno != EAGAIN) perror("On client accept\n");
 		}
 	}
 }

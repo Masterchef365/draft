@@ -7,7 +7,7 @@
 #include <util.h>
 
 #define DEVICE_NAME_LENGTH 64
-#define DEBUG_I2C 1
+#define DEBUG_I2C 0
 
 #define MOTOR_VARS() \
 	VAR(target) \
@@ -17,11 +17,12 @@
 	VAR(kd) \
 	VAR(mode) \
 	VAR(home) \
+	VAR(home_pwm) \
 	VAR(enable) \
+	VAR(max_pwm) \
 
 #define MOTORS() \
 	MOTOR(gantry) \
-	MOTOR(forward) \
 
 typedef struct Motor {
 	char name[DEVICE_NAME_LENGTH];

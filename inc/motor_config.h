@@ -8,6 +8,8 @@
 	MEMBER(float, Kp, "%f") \
 	MEMBER(float, Ki, "%f") \
 	MEMBER(float, Kd, "%f") \
+	MEMBER(int, max_pwm, "%i") \
+	MEMBER(int, home_pwm, "%i") \
 	MEMBER(unsigned char, address, "0x%hhx") \
 
 #include <make_config.h>
