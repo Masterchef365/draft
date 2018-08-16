@@ -2,7 +2,6 @@
 #define MOTOR_CONFIG_H
 
 #define CONFIG_STRUCT_NAME MotorConfig
-#define CONFIG_MANAGER_STRUCT_NAME MotorConfigManager
 #define CONFIG_FUNCTION_PREFIX(NAME) motor_##NAME
 #define MEMBERS() \
 	MEMBER(float, Kp, "%f") \
@@ -16,7 +15,6 @@
 
 #undef CONFIG_STRUCT_NAME
 #undef CONFIG_FUNCTION_PREFIX
-#undef CONFIG_MANAGER_STRUCT_NAME
 #undef MEMBERS
 
 #endif
