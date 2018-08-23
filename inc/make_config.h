@@ -42,22 +42,26 @@ typedef struct CONFIG_FUNCTION_PREFIX(hash_cache) {
 #undef MEMBER
 
 /* Create the function <prefix>_create_hash_cache(),
- * instantiates an isntance of the <prefix>_hash_cache struct 
+ * instantiates an instance of the <prefix>_hash_cache struct 
  * and populates it with the hashes of all of the variable names */
 extern CONFIG_FUNCTION_PREFIX(hash_cache) CONFIG_FUNCTION_PREFIX(create_hash_cache) ();
 
 /* Create the function <prefix>_parse_config() which 
  * creates an instance of the Config struct (named CONFIG_STRUCT_NAME)
  * given a file pointer to parse the config from. */
-extern CONFIG_STRUCT_NAME CONFIG_FUNCTION_PREFIX(parse_config) (FILE* file);
+extern void CONFIG_FUNCTION_PREFIX(parse_config) (FILE* file, CONFIG_STRUCT_NAME* config);
 
 /* Create the function <prefix>_write_config() which will create
  * a parseable and human readable config file from an existing config
  * structure. */
-extern void CONFIG_FUNCTION_PREFIX(write_config) (FILE* file, CONFIG_STRUCT_NAME * conf);
+extern void CONFIG_FUNCTION_PREFIX(write_config) (FILE* file, CONFIG_STRUCT_NAME* config);
 
 /* The same thing but write to a string instead */
 extern char* CONFIG_FUNCTION_PREFIX(write_config_str) (char* output_str, CONFIG_STRUCT_NAME * conf);
+
+/* Either load the config file from the directory, 
+ * or create a default using existing values in the struct. */
+extern void CONFIG_FUNCTION_PREFIX(load_or_write_defaults_from_dir) (char* dir, char* name, CONFIG_STRUCT_NAME* config);
 
 /* Should only be included with this macro once per project in a 
  * *_config.c file, creates the actual implementations */ 

@@ -3,3 +3,4 @@ main
 .sconsign.dblite
 compile_commands.json
 old.c
+disabled/

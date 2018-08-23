@@ -1,96 +1,58 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <motors.h>
+#include <string.h>
 #include <util.h>
-#include <command_line_logic.h>
-#include <client_handler.h>
 #include <server_config.h>
+#include <sys/types.h>
+#include <dirent.h>
+
+int get_first_i2c_fd ();
+const char* debug_i2c_flag_str = "-debug_i2c";
 
 int main(int argc, char** argv) {
 	/* Warn user of incorrect usage and exit */
 	if (argc < 2) {
-		fprintf(stderr, "Usage: %s <config dir>\n", argv[0]);
+		fprintf(stderr, "Usage: %s <config dir> %s\n", argv[0], debug_i2c_flag_str);
 		exit(EXIT_FAILURE);
 	}
+
 	char* config_dir = argv[1];
 
-	/* Load server config file or fail and write an empty one */
-	FILE* server_config_file;
-	ServerConfig server_config;
-	if (!(server_config_file = file_ptr_config_file(config_dir, "server", "r"))) {
-		server_config_file = file_ptr_config_file(config_dir, "server", "w");
-		bzero(&server_config, sizeof(ServerConfig));
-		server_write_config(server_config_file, &server_config);
-		fclose(server_config_file);
-		exit(EXIT_FAILURE);
-	} else {
-		server_config = server_parse_config(server_config_file);
-		fclose(server_config_file);
+	/* Debug I2C? */
+	int debug_i2c = 0;
+	if (argc == 3 && strcmp(argv[2], debug_i2c_flag_str) == 0) {
+		debug_i2c = 1;
+		fprintf(stderr, "Warning, running in I2C debug mode. Remove %s to disable. \n", debug_i2c_flag_str);
 	}
 
+	/* Warn user of nonexistant config dir and exit */
+	if (closedir(opendir(config_dir)) == -1) {
+		fprintf(stderr, "Config directory at %s does not exist\n", config_dir);
+		exit(EXIT_FAILURE);
+	}
+
+	/* Load server config or default */
+	ServerConfig server_config = {0};
+	server_config.portno = 5060;
+	server_config.timeout_ms = 10;
+	server_load_or_write_defaults_from_dir(config_dir, "server.cfg", &server_config);
+
+	/* If we aren't debugging, find and open an I2C device */
 	int i2c_bus_fd = -1;
-#if !DEBUG_I2C
-	if ((i2c_bus_fd = get_first_i2c_fd()) == -1) {
+	if (!debug_i2c && (i2c_bus_fd = get_first_i2c_fd()) == -1) {
 		fprintf(stderr, "Failed to find a suitible i2c bus in /dev/. Exiting.\n");
 		exit(EXIT_FAILURE);
 	}
-#endif
+}
 
-	/* Load motor configs from directory */
-	MotorArray motors;
-	if (!motor_array_from_config_dir(i2c_bus_fd, config_dir, &motors)) {
-		fprintf(stderr, "Failed to initialize one or more motors. Exiting.\n");
-		exit(EXIT_FAILURE);
+/* Find an i2c device file and return the file descriptor. 
+ * Searches /dev/i2c-* from 0 to MAX_I2C_DEV_SEARCH. */
+int get_first_i2c_fd () {
+	char dir_name_buf[64];
+	int fd;
+	for (int i = 0; i < 20; i++) {
+		snprintf(dir_name_buf, 64, "/dev/i2c-%i", i);
+		if ((fd = open(dir_name_buf, O_RDWR)) != -1) return fd;
 	}
-
-	ClientHandler handler = create_client_handler(server_config.portno, server_config.timeout_ms);
-
-	int run_app = 1;
-	const size_t cmd_buf_len = 1024;
-	char cmd_in_buf[cmd_buf_len];
-	char cmd_out_buf[cmd_buf_len];
-	bzero(cmd_in_buf, cmd_buf_len);
-	enum CommandLineState {
-		cmd_idle, cmd_disconnected, cmd_wait_send
-	} cmd_state = cmd_disconnected;
-
-	char joystick_buf[64];
-	char vision_buf[64];
-
-	do {
-		handle_connections(&handler);
-
-		if (cmd_state == cmd_disconnected && handler.clients.cmd.fd != -1) {
-			snprintf(cmd_out_buf, cmd_buf_len, "BroccoliBot motor server v0.1\n> ");
-			cmd_state = cmd_wait_send;
-		}
-		if (cmd_state != cmd_disconnected && handler.clients.cmd.fd == -1) cmd_state = cmd_disconnected;
-		if (cmd_state == cmd_wait_send && handle_write(&handler.clients.cmd, cmd_out_buf, strlen(cmd_out_buf))) cmd_state = cmd_idle;
-		if (cmd_state == cmd_idle && handle_read(&handler.clients.cmd, cmd_in_buf, cmd_buf_len)) {
-			cmd_in_buf[strlen(cmd_in_buf) - 1] = '\0'; /* Remove trailing newline */
-			run_app = command_line_logic(cmd_in_buf, cmd_out_buf, cmd_buf_len, &motors);
-			cmd_state = cmd_wait_send;
-			bzero(cmd_in_buf, cmd_buf_len);
-		}
-
-		if (handle_read(&handler.clients.joystick, joystick_buf, 64)) {
-			char type_buf[32];
-			int idx, value;
-			if (sscanf(joystick_buf, "%s %i %i\n", type_buf, &idx, &value) == 3) {
-				if (strcmp(type_buf, "axs") == 0) {
-					if (idx == 1) motor_send_var(&motors.gantry, motor_num_target, (float)value);
-				}
-			}
-		}
-
-		if (handle_read(&handler.clients.vision, vision_buf, 64)) {
-			int value;
-			if (sscanf(vision_buf, "%i\n", &value) == 1) {
-				motor_send_var(&motors.gantry, motor_num_target, (float)value);
-			}
-		}
-	} while(run_app);
-	hander_close(&handler);	
-
-	motor_array_rewrite_config_dir(config_dir, &motors);	
+	return fd;
 }
