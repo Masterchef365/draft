@@ -24,6 +24,7 @@
 #include <string.h>
 #include <util.h>
 #include <errno.h>
+#include <prettylog.h>
 
 /* Create the members of the configuration storage struct 
  * (named CONFIG_STRUCT_NAME) using the MEMBERS() macro */
@@ -60,8 +61,9 @@ extern void CONFIG_FUNCTION_PREFIX(write_config) (FILE* file, CONFIG_STRUCT_NAME
 extern char* CONFIG_FUNCTION_PREFIX(write_config_str) (char* output_str, CONFIG_STRUCT_NAME * conf);
 
 /* Either load the config file from the directory, 
- * or create a default using existing values in the struct. */
-extern void CONFIG_FUNCTION_PREFIX(load_or_write_defaults_from_dir) (char* dir, char* name, CONFIG_STRUCT_NAME* config);
+ * or create a default using existing values in the struct. 
+ * returns 1 if parsed, 0 if created */
+extern int CONFIG_FUNCTION_PREFIX(load_or_write_defaults_from_dir) (char* dir, char* name, CONFIG_STRUCT_NAME* config);
 
 /* Should only be included with this macro once per project in a 
  * *_config.c file, creates the actual implementations */ 

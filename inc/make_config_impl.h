@@ -36,16 +36,20 @@ void CONFIG_FUNCTION_PREFIX(write_config) (FILE* file, CONFIG_STRUCT_NAME *confi
 #undef MEMBER
 }
 
-void CONFIG_FUNCTION_PREFIX(load_or_write_defaults_from_dir) (char* dir, char* name, CONFIG_STRUCT_NAME* config) {
+int CONFIG_FUNCTION_PREFIX(load_or_write_defaults_from_dir) (char* dir, char* name, CONFIG_STRUCT_NAME* config) {
 	char full_dir[1024];
 	sprintf(full_dir, "%s/%s", dir, name);
 	FILE* config_file_ptr;
+	int ret = 0;
 	if (!(config_file_ptr = fopen(full_dir, "r"))) {
-		fprintf(stderr, "Warning: could not find %s, creating default.\n", full_dir);
+		inform_log(log_warn, "Could not find %s, creating default.", full_dir);
 		config_file_ptr = fopen(full_dir, "w");
 		CONFIG_FUNCTION_PREFIX(write_config)(config_file_ptr, config);
+		fclose(config_file_ptr);
+		return 0;
 	} else {
 		CONFIG_FUNCTION_PREFIX(parse_config)(config_file_ptr, config);
+		fclose(config_file_ptr);
+		return 1;
 	}
-	fclose(config_file_ptr);
 }
