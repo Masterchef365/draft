@@ -10,12 +10,19 @@
 #include <prettylog.h>
 #include <readline/readline.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <netdb.h> 
+
+const char* debug_i2c_flag_str = "-debug_i2c"; /* Flag string to display and match against */
+char last_command_line[512]; /* What was last input on the command line */
+
 int get_first_i2c_fd ();
-const char* debug_i2c_flag_str = "-debug_i2c";
-
-char last_command_line[512];
-
 void line_handler(char* line);
+void option_reassign_socket(struct pollfd* target, int new_fd);
 
 int main(int argc, char** argv) {
 	/* Warn user of incorrect usage and exit */
@@ -65,6 +72,8 @@ int main(int argc, char** argv) {
 		//struct pollfd vision_fd;
 		struct pollfd joystick_fd;
 		struct pollfd cmdline_fd;
+		struct pollfd server_fd;
+		struct pollfd new_fd;
 	} fd_array = {0};
 	size_t fd_array_size = sizeof(fd_array) / sizeof(struct pollfd);
 	struct pollfd* fd_array_ptr = (struct pollfd*)&fd_array;
@@ -76,11 +85,52 @@ int main(int argc, char** argv) {
 	/* Joystick file descriptor */
 	fd_array.joystick_fd.events = POLLIN | POLLHUP;
 	fd_array.joystick_fd.fd = -1; /* -1 indicates disconnected */
+	
+	/* Unkown connection file descriptor; 
+	 * handles new unassigned connections. */
+	fd_array.new_fd.events = POLLIN | POLLHUP;
+	fd_array.new_fd.fd = -1; /* -1 indicates disconnected */
+
+	/* Server file descriptor. Handles async client acception. */
+	fd_array.server_fd.events = POLLIN | POLLHUP;
+	fd_array.server_fd.fd = -1; /* -1 indicates disconnected */
+
+	/* Server socket */
+	struct sockaddr_in serv_addr; /* Server address struct */
+	serv_addr.sin_port = htons(server_config.portno);
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = INADDR_ANY;
+	fd_array.server_fd.fd = socket(AF_INET, SOCK_STREAM, 0);
+
+	/* Reuse server port. When exited incorrectly, the server can leave behind some data. */
+	{
+		int tmp;
+		if (setsockopt(fd_array.server_fd.fd, SOL_SOCKET, SO_REUSEADDR, &tmp, sizeof(tmp)) < 0) {
+			inform_log(log_fail, "Reusing server socket; %s", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	/* Bind the server socket to the address */
+	if (bind(fd_array.server_fd.fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+		inform_log(log_fail, "Binding server socket; %s", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	/* Start listening on the server socket */
+	listen(fd_array.server_fd.fd, 5);
 
 	/* Main loop */
 	int keep_running = 1;
 	while (keep_running) if (poll(fd_array_ptr, fd_array_size, -1)) {
 		inform_log(log_warn, "LOOP");
+
+		/* Handle joystick input */
+		if (fd_array.joystick_fd.revents & POLLIN) {
+			char buf[512] = {0};
+			size_t n_read = read(fd_array.joystick_fd.fd, buf, 512);
+			inform_log(log_info, "Joystick says: %s", buf);
+		}
 
 		/* Handle command line activity */
 		if (fd_array.cmdline_fd.revents & POLLIN) {
@@ -92,25 +142,52 @@ int main(int argc, char** argv) {
 			}
 		}
 
-		/* Safely close and negate hung up sockets */
-		for (int i = 0; i < fd_array_size; i++) {
-			struct pollfd* select = &fd_array_ptr[i];
-			if (select->revents & POLLHUP) {
-				close(select->fd);
-				select->fd = -1;
+		/* Accept new clients */
+		if (fd_array.server_fd.revents & POLLIN) {
+			struct sockaddr_in cli_addr; /* Client address struct */
+			socklen_t clilen = sizeof(cli_addr);
+
+			/* Remove old client, sorry bud you took too long. */
+			int new_connection = accept(fd_array.server_fd.fd, (struct sockaddr *) &cli_addr, &clilen);
+			option_reassign_socket(&fd_array.new_fd, new_connection);
+
+			/* Display connected IP */
+			char ipstr[INET6_ADDRSTRLEN];
+    		inet_ntop(AF_INET, &cli_addr.sin_addr, ipstr, sizeof ipstr);
+			inform_log(log_info, "New client from [%s]", ipstr);
+		}
+
+		/* Handle id on unassigned connection */
+		if (fd_array.new_fd.revents & POLLIN) {
+			char buf[512] = {0};
+			size_t n_read = read(fd_array.new_fd.fd, buf, 512);
+			if (strcmp(buf, "id:joystick\n") == 0) {
+				inform_log(log_info, "Joystick assigned");
+				option_reassign_socket(&fd_array.joystick_fd, fd_array.new_fd.fd);
+				fd_array.new_fd.fd = -1;
 			}
+		}
+
+		/* Safely close and negate hung up sockets */
+		if ((fd_array.joystick_fd.revents & POLLHUP && fd_array.joystick_fd.fd != -1) || !keep_running) {
+			inform_log(log_warn, "Joystick has disconnected");
+			option_reassign_socket(&fd_array.joystick_fd, -1);
+		}
+		if ((fd_array.new_fd.revents & POLLHUP && fd_array.new_fd.fd != -1) || !keep_running) {
+			inform_log(log_warn, "Unassigned client has disconnected");
+			option_reassign_socket(&fd_array.new_fd, -1);
 		}
 	}
 
-	inform_log(log_info, "Server loop ended, freeing memory and quitting.");
-	
+	inform_log(log_info, "Server loop ended, exiting gracefully.");
+
 	/* Clean up readline */
 	rl_reset_line_state();
 	rl_restore_prompt();
 	rl_cleanup_after_signal();
 	rl_callback_handler_remove();
 
-	/* De-ugly the command line */
+	/* De-uglify the command line */
 	putchar('\n');
 
 	/* Close I2C bus */
@@ -132,4 +209,13 @@ int get_first_i2c_fd () {
 /* Fake line handler, workaround */
 void line_handler(char* line) {
 	strcpy(last_command_line, line);
+}
+
+void option_reassign_socket(struct pollfd* target, int new_fd) {
+	if (target->fd != -1) {
+		close(target->fd);
+		if (new_fd != -1) 
+			inform_log(log_warn, "Kicked an old client in favor of a new connection");
+	}
+	target->fd = new_fd;
 }

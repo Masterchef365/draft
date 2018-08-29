@@ -8,6 +8,7 @@
 #include <readline/readline.h>
 
 enum WarnLevel {
+	log_silent,
 	log_info,
 	log_warn,
 	log_fail,

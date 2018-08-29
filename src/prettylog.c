@@ -1,12 +1,14 @@
 #include <prettylog.h>
 
 static char* warn_level_names[] = {
+	"",
 	"INFO",
 	"WARN",
 	"FAIL",
 };
 
 static char* warn_level_color_codes[] = {
+	"",
 	"",
 	"\e[1m\e[33m",
 	"\e[1m\e[31m",
