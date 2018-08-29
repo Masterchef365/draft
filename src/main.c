@@ -123,8 +123,6 @@ int main(int argc, char** argv) {
 	/* Main loop */
 	int keep_running = 1;
 	while (keep_running) if (poll(fd_array_ptr, fd_array_size, -1)) {
-		inform_log(log_warn, "LOOP");
-
 		/* Handle joystick input */
 		if (fd_array.joystick_fd.revents & POLLIN) {
 			char buf[512] = {0};
@@ -136,8 +134,28 @@ int main(int argc, char** argv) {
 		if (fd_array.cmdline_fd.revents & POLLIN) {
 			rl_callback_read_char();
 			if (*last_command_line != '\0') {
-				inform_log(log_info, "You entered: %s", last_command_line);
-				if (*last_command_line == 'q' && strlen(last_command_line) == 1) keep_running = 0;
+				char* command_root = strtok(last_command_line, " ");
+				if (strcmp(command_root, "ls") == 0) {
+					char* list_target = strtok(NULL, " ");
+					if (list_target != NULL) {
+						if (strcmp(list_target, "connect") == 0) {
+							inform_log(log_silent, "Joystick:   %s", fd_array.joystick_fd.fd != -1 ? "Y" : "N");
+							inform_log(log_silent, "Unassigned: %s", fd_array.new_fd.fd != -1 ? "Y" : "N");
+						} else {
+							inform_log(log_info, "Unrecognized list '%s'", list_target);
+						}
+					} else {
+						inform_log(log_info, "Expected target");
+					}
+
+				} else if (strcmp(command_root, "q") == 0 || strcmp(command_root, "exit") == 0) {
+					keep_running = 0;
+				} else if (strcmp(command_root, "clear") == 0) {
+					printf("\e[3J\e[H\e[2J");
+					rl_forced_update_display();
+				} else {
+					inform_log(log_info, "Unrecognized command: %s", command_root);
+				}
 				*last_command_line = '\0';
 			}
 		}

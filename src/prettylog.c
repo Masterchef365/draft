@@ -1,17 +1,10 @@
 #include <prettylog.h>
 
 static char* warn_level_names[] = {
-	"",
-	"INFO",
-	"WARN",
-	"FAIL",
-};
-
-static char* warn_level_color_codes[] = {
-	"",
-	"",
-	"\e[1m\e[33m",
-	"\e[1m\e[31m",
+	"\t",
+	"[ INFO ] ",
+	"\e[1m\e[33m[ WARN ] \e[m",
+	"\e[1m\e[31m[ FAIL ] \e[m",
 };
 
 void inform_log(enum WarnLevel level, char* fmt, ...) {
@@ -20,11 +13,11 @@ void inform_log(enum WarnLevel level, char* fmt, ...) {
 	printf("\e[1K\r");
 
 	/* Count required length and create a buffer of sufficient size */
-	size_t size = 1 + snprintf(NULL, 0, "\r%s[ %s ]\e[m %s\n", warn_level_color_codes[level], warn_level_names[level], fmt );
+	size_t size = 1 + snprintf(NULL, 0, "\r%s%s\n", warn_level_names[level], fmt );
 	char new_fmt[size];
 
 	/* Write out the new format string */
-	snprintf(new_fmt, size, "\r%s[ %s ]\e[m %s\n", warn_level_color_codes[level], warn_level_names[level], fmt );
+	snprintf(new_fmt, size, "\r%s%s\n", warn_level_names[level], fmt );
 
 	/* Write to console */
 	va_list args;
