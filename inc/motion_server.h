@@ -40,9 +40,6 @@ typedef struct MotionServer {
 
 } MotionServer;
 
-void motion_server_init_configs(MotionServer* server, char* config_dir);
-void motion_server_commandline_init(MotionServer* server);
-void motion_server_init_socket(MotionServer* server);
 void motion_server_init(MotionServer* server, char* config_dir, int debug_i2c);
 int  motion_server_loop(MotionServer* server);
 void motion_server_destruct(MotionServer* server);

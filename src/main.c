@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <motion_server.h>
 
 const char* debug_i2c_flag_str = "-debug_i2c"; /* Flag string to display and match against */

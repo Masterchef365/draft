@@ -9,6 +9,13 @@ static void option_reassign_socket(struct pollfd* target, int new_fd);
  * without a callback. Eww. */
 static char last_command_line[512]; 
 
+static inline void motion_server_init_configs(MotionServer* server, char* config_dir);
+static inline void motion_server_commandline_init(MotionServer* server);
+static inline void motion_server_init_socket(MotionServer* server);
+static inline void motion_server_new_client(MotionServer* server);
+static inline void motion_server_new_client_set_id(MotionServer* server);
+static inline int  motion_server_parse_command(MotionServer* server, char* input_string);
+
 /* Find an i2c device file and return the file descriptor. 
  * Searches /dev/i2c-* from 0 to MAX_I2C_DEV_SEARCH. */
 int get_first_i2c_fd () {
@@ -26,7 +33,7 @@ static void line_handler(char* line) {
 	strcpy(last_command_line, line);
 }
 
-void option_reassign_socket(struct pollfd* target, int new_fd) {
+static void option_reassign_socket(struct pollfd* target, int new_fd) {
 	if (target->fd != -1) {
 		close(target->fd);
 		if (new_fd != -1) 
@@ -35,7 +42,7 @@ void option_reassign_socket(struct pollfd* target, int new_fd) {
 	target->fd = new_fd;
 }
 
-void motion_server_init_configs(MotionServer* server, char* config_dir) {
+static void motion_server_init_configs(MotionServer* server, char* config_dir) {
 
 	/* Warn user of nonexistant config dir and exit */
 	if (closedir(opendir(config_dir)) == -1) {
@@ -53,7 +60,7 @@ void motion_server_init_configs(MotionServer* server, char* config_dir) {
 
 }
 
-void motion_server_commandline_init(MotionServer* server) {
+static void motion_server_commandline_init(MotionServer* server) {
 	/* Create GNU readline command line handler */
 	rl_callback_handler_install("> ", line_handler);
 
@@ -62,7 +69,34 @@ void motion_server_commandline_init(MotionServer* server) {
 	server->fd_array.cmdline_fd.events = POLLIN;
 }
 
-void motion_server_init_socket(MotionServer* server) {
+static inline int  motion_server_parse_command(MotionServer* server, char* input_string) {
+	int keep_running = 1;
+	char* command_root = strtok(input_string, " ");
+	if (strcmp(command_root, "ls") == 0) {
+		char* list_target = strtok(NULL, " ");
+		if (list_target != NULL) {
+			if (strcmp(list_target, "connect") == 0) {
+				inform_log(log_silent, "Joystick:   %s", server->fd_array.joystick_fd.fd != -1 ? "Y" : "N");
+				inform_log(log_silent, "Unassigned: %s", server->fd_array.new_fd.fd != -1 ? "Y" : "N");
+			} else {
+				inform_log(log_info, "Unrecognized list '%s'", list_target);
+			}
+		} else {
+			inform_log(log_info, "Expected target");
+		}
+
+	} else if (strcmp(command_root, "q") == 0 || strcmp(command_root, "exit") == 0) {
+		keep_running = 0;
+	} else if (strcmp(command_root, "clear") == 0) {
+		printf("\e[3J\e[H\e[2J");
+		rl_forced_update_display();
+	} else {
+		inform_log(log_info, "Unrecognized command: %s", command_root);
+	}
+	return keep_running;
+}
+
+static void motion_server_init_socket(MotionServer* server) {
 	/* Calculate size of internal fd array */
 	server->fd_array_size = sizeof(server->fd_array) / sizeof(struct pollfd);
 	server->fd_array_ptr = (struct pollfd*)&server->fd_array;
@@ -126,11 +160,35 @@ void motion_server_init(MotionServer* server, char* config_dir, int debug_i2c) {
 	motion_server_commandline_init(server);
 }
 
+static void motion_server_new_client(MotionServer* server) {
+	struct sockaddr_in cli_addr; /* Client address struct */
+	socklen_t clilen = sizeof(cli_addr);
+
+	/* Remove old client, sorry bud you took too long. */
+	int new_connection = accept(server->fd_array.server_fd.fd, (struct sockaddr *) &cli_addr, &clilen);
+	option_reassign_socket(&server->fd_array.new_fd, new_connection);
+
+	/* Display connected IP */
+	char ipstr[INET6_ADDRSTRLEN];
+	inet_ntop(AF_INET, &cli_addr.sin_addr, ipstr, sizeof ipstr);
+	inform_log(log_info, "New client from [%s]", ipstr);
+}
+
+static inline void motion_server_new_client_set_id(MotionServer* server) {
+	char buf[512] = {0};
+	size_t n_read = read(server->fd_array.new_fd.fd, buf, 512);
+	if (strcmp(buf, "id:joystick\n") == 0) {
+		inform_log(log_info, "Joystick assigned");
+		option_reassign_socket(&server->fd_array.joystick_fd, server->fd_array.new_fd.fd);
+		server->fd_array.new_fd.fd = -1;
+	}
+}
+
 int motion_server_loop(MotionServer* server) {
 	int keep_running = 1;
 
-	int n = poll(server->fd_array_ptr, server->fd_array_size, -1);
-	//inform_log(log_info, "Res: %i %s", n, strerror(errno));
+	/* Block until we have activity on any input */ 
+	poll(server->fd_array_ptr, server->fd_array_size, -1);
 
 	/* Handle joystick input */
 	if (server->fd_array.joystick_fd.revents & POLLIN) {
@@ -143,57 +201,18 @@ int motion_server_loop(MotionServer* server) {
 	if (server->fd_array.cmdline_fd.revents & POLLIN) {
 		rl_callback_read_char();
 		if (*last_command_line != '\0') {
-			char* command_root = strtok(last_command_line, " ");
-			if (strcmp(command_root, "ls") == 0) {
-				char* list_target = strtok(NULL, " ");
-				if (list_target != NULL) {
-					if (strcmp(list_target, "connect") == 0) {
-						inform_log(log_silent, "Joystick:   %s", server->fd_array.joystick_fd.fd != -1 ? "Y" : "N");
-						inform_log(log_silent, "Unassigned: %s", server->fd_array.new_fd.fd != -1 ? "Y" : "N");
-					} else {
-						inform_log(log_info, "Unrecognized list '%s'", list_target);
-					}
-				} else {
-					inform_log(log_info, "Expected target");
-				}
-
-			} else if (strcmp(command_root, "q") == 0 || strcmp(command_root, "exit") == 0) {
-				keep_running = 0;
-			} else if (strcmp(command_root, "clear") == 0) {
-				printf("\e[3J\e[H\e[2J");
-				rl_forced_update_display();
-			} else {
-				inform_log(log_info, "Unrecognized command: %s", command_root);
-			}
+			motion_server_parse_command(server, last_command_line);	
 			*last_command_line = '\0';
 		}
 	}
 
 	/* Accept new clients */
-	if (server->fd_array.server_fd.revents & POLLIN) {
-		struct sockaddr_in cli_addr; /* Client address struct */
-		socklen_t clilen = sizeof(cli_addr);
-
-		/* Remove old client, sorry bud you took too long. */
-		int new_connection = accept(server->fd_array.server_fd.fd, (struct sockaddr *) &cli_addr, &clilen);
-		option_reassign_socket(&server->fd_array.new_fd, new_connection);
-
-		/* Display connected IP */
-		char ipstr[INET6_ADDRSTRLEN];
-		inet_ntop(AF_INET, &cli_addr.sin_addr, ipstr, sizeof ipstr);
-		inform_log(log_info, "New client from [%s]", ipstr);
-	}
+	if (server->fd_array.server_fd.revents & POLLIN)
+		motion_server_new_client(server);
 
 	/* Handle id on unassigned connection */
-	if (server->fd_array.new_fd.revents & POLLIN) {
-		char buf[512] = {0};
-		size_t n_read = read(server->fd_array.new_fd.fd, buf, 512);
-		if (strcmp(buf, "id:joystick\n") == 0) {
-			inform_log(log_info, "Joystick assigned");
-			option_reassign_socket(&server->fd_array.joystick_fd, server->fd_array.new_fd.fd);
-			server->fd_array.new_fd.fd = -1;
-		}
-	}
+	if (server->fd_array.new_fd.revents & POLLIN)
+		motion_server_new_client_set_id(server);
 
 	/* Safely close and negate hung up sockets */
 	if ((server->fd_array.joystick_fd.revents & POLLHUP && server->fd_array.joystick_fd.fd != -1) || !keep_running) {
