@@ -10,7 +10,7 @@ static void option_reassign_socket(struct pollfd* target, int new_fd);
 static char last_command_line[512]; 
 
 static inline void motion_server_init_configs(MotionServer* server, char* config_dir);
-static inline void motion_server_commandline_init(MotionServer* server);
+static inline void motion_server_init_commandline(MotionServer* server);
 static inline void motion_server_init_socket(MotionServer* server);
 static inline void motion_server_new_client(MotionServer* server);
 static inline void motion_server_new_client_set_id(MotionServer* server);
@@ -60,7 +60,7 @@ static void motion_server_init_configs(MotionServer* server, char* config_dir) {
 
 }
 
-static void motion_server_commandline_init(MotionServer* server) {
+static void motion_server_init_commandline(MotionServer* server) {
 	/* Create GNU readline command line handler */
 	rl_callback_handler_install("> ", line_handler);
 
@@ -157,7 +157,7 @@ void motion_server_init(MotionServer* server, char* config_dir, int debug_i2c) {
 	motion_server_init_socket(server);
 
 	/* Enable and initialize command line */
-	motion_server_commandline_init(server);
+	motion_server_init_commandline(server);
 }
 
 static void motion_server_new_client(MotionServer* server) {
@@ -201,7 +201,7 @@ int motion_server_loop(MotionServer* server) {
 	if (server->fd_array.cmdline_fd.revents & POLLIN) {
 		rl_callback_read_char();
 		if (*last_command_line != '\0') {
-			motion_server_parse_command(server, last_command_line);	
+			keep_running = motion_server_parse_command(server, last_command_line);	
 			*last_command_line = '\0';
 		}
 	}
