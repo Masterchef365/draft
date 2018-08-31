@@ -32,10 +32,10 @@ union MotorKeyMessage {
 	unsigned char num;
 };
 
-extern char* motor_key_names[];
-
 enum MotorKey motor_key_from_string(char* input);
 
 void motor_send_var(int fd, enum MotorKey key, float value);
+
+char* motor_string_from_key(enum MotorKey key);
 
 #endif

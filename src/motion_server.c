@@ -54,7 +54,7 @@ static void motion_server_select_motor_send(MotionServer* server, MotorConfig* m
 	}
 
 	if (server->debug_i2c) {
-		inform_log(log_info, "I2C_DEBUG: (0x%hhx) %s = %f", motor->address, motor_key_names[key], value);
+		inform_log(log_info, "I2C_DEBUG: (0x%hhx) %s = %f", motor->address, motor_string_from_key(key), value);
 	} else {
 		/* If the last address sent to/received from isn't the current 
 		 * selected address, tell the fd to point to that address */
@@ -81,6 +81,8 @@ static void motion_server_bootstrap_motor(MotionServer* server, MotorConfig* mot
 	motion_server_select_motor_send(server, motor, motor_key_kp, motor->Kp);
 	motion_server_select_motor_send(server, motor, motor_key_ki, motor->Ki);
 	motion_server_select_motor_send(server, motor, motor_key_kd, motor->Kd);
+	motion_server_select_motor_send(server, motor, motor_key_enable, 0);
+	motion_server_select_motor_send(server, motor, motor_key_home, 0);
 }
 
 static void motion_server_init_configs(MotionServer* server, char* config_dir) {
@@ -126,7 +128,7 @@ static int motion_server_parse_command(MotionServer* server, char* input_string)
 		char* list_target = strtok(NULL, " ");
 		if (list_target != NULL) {
 			if (strcmp(list_target, "connect") == 0) {
-				inform_log(log_silent, "Joystick:   %s", server->fd_array.joystick_fd.fd != -1 ? "Y" : "N");
+				inform_log(log_silent, "Vision:   %s", server->fd_array.vision_fd.fd != -1 ? "Y" : "N");
 				inform_log(log_silent, "Unassigned: %s", server->fd_array.new_fd.fd != -1 ? "Y" : "N");
 			} else {
 				inform_log(log_info, "Unrecognized list '%s'", list_target);
@@ -148,15 +150,17 @@ static int motion_server_parse_command(MotionServer* server, char* input_string)
 		} else {
 			unsigned char address = 0;
 			sscanf(addrs_str, "0x%hhx", &address);
+
 			enum MotorKey key = motor_key_from_string(field_str);
 			if (key == motor_key_count) {
 				inform_log(log_info, "Motor key must be one of:");
-				for (int i = 0; i <= motor_key_count; i++) {
-					inform_log(log_silent, "%s", i, motor_key_names[i]);
+				for (int i = 1; i < motor_key_count; i++) {
+					inform_log(log_silent, "%s", motor_string_from_key(i));
 				}
 			}
 
 			float value = atof(value_str);
+
 			MotorConfig* config = motion_server_motor_by_address(server, address);
 			if (config) {
 				motion_server_select_motor_send(server, config, key, value);
@@ -175,9 +179,9 @@ static void motion_server_init_socket(MotionServer* server) {
 	server->fd_array_size = sizeof(server->fd_array) / sizeof(struct pollfd);
 	server->fd_array_ptr = (struct pollfd*)&server->fd_array;
 
-	/* Joystick file descriptor */
-	server->fd_array.joystick_fd.events = POLLIN | POLLHUP;
-	server->fd_array.joystick_fd.fd = -1; /* -1 indicates disconnected */
+	/* Vision file descriptor */
+	server->fd_array.vision_fd.events = POLLIN | POLLHUP;
+	server->fd_array.vision_fd.fd = -1; /* -1 indicates disconnected */
 
 	/* Unkown connection file descriptor; 
 	 * handles new unassigned connections. */
@@ -252,9 +256,9 @@ static void motion_server_new_client(MotionServer* server) {
 static inline void motion_server_new_client_set_id(MotionServer* server) {
 	char buf[512] = {0};
 	size_t n_read = read(server->fd_array.new_fd.fd, buf, 512);
-	if (strcmp(buf, "id:joystick\n") == 0) {
-		inform_log(log_info, "Joystick assigned");
-		option_reassign_socket(&server->fd_array.joystick_fd, server->fd_array.new_fd.fd);
+	if (strcmp(buf, "id:vision\n") == 0) {
+		inform_log(log_info, "Vision assigned");
+		option_reassign_socket(&server->fd_array.vision_fd, server->fd_array.new_fd.fd);
 		server->fd_array.new_fd.fd = -1;
 	}
 }
@@ -265,11 +269,11 @@ int motion_server_loop(MotionServer* server) {
 	/* Block until we have activity on any input */ 
 	poll(server->fd_array_ptr, server->fd_array_size, -1);
 
-	/* Handle joystick input */
-	if (server->fd_array.joystick_fd.revents & POLLIN) {
+	/* Handle vision input */
+	if (server->fd_array.vision_fd.revents & POLLIN) {
 		char buf[512] = {0};
-		size_t n_read = read(server->fd_array.joystick_fd.fd, buf, 512);
-		inform_log(log_info, "Joystick says: %s", buf);
+		size_t n_read = read(server->fd_array.vision_fd.fd, buf, 512);
+		inform_log(log_info, "Vision says: %s", buf);
 	}
 
 	/* Handle command line activity */
@@ -290,9 +294,9 @@ int motion_server_loop(MotionServer* server) {
 		motion_server_new_client_set_id(server);
 
 	/* Safely close and negate hung up sockets */
-	if ((server->fd_array.joystick_fd.revents & POLLHUP && server->fd_array.joystick_fd.fd != -1) || !keep_running) {
-		inform_log(log_warn, "Joystick has disconnected");
-		option_reassign_socket(&server->fd_array.joystick_fd, -1);
+	if ((server->fd_array.vision_fd.revents & POLLHUP && server->fd_array.vision_fd.fd != -1) || !keep_running) {
+		inform_log(log_warn, "Vision has disconnected");
+		option_reassign_socket(&server->fd_array.vision_fd, -1);
 	}
 	if ((server->fd_array.new_fd.revents & POLLHUP && server->fd_array.new_fd.fd != -1) || !keep_running) {
 		inform_log(log_warn, "Unassigned client has disconnected");

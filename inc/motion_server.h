@@ -40,7 +40,7 @@ typedef struct MotionServer {
 
 	/* polling file descriptor tagged array */
 	struct {
-		struct pollfd joystick_fd;
+		struct pollfd vision_fd;
 		struct pollfd cmdline_fd;
 		struct pollfd server_fd;
 		struct pollfd new_fd;

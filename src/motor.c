@@ -1,7 +1,7 @@
 #include <motor.h>
 
 #define KEY(NAME) #NAME,
-char* motor_key_names[] = {
+static char* motor_key_names[] = {
 	"<none>",
 	MOTOR_KEYS()
 	"<invalid>"
@@ -20,4 +20,8 @@ void motor_send_var(int fd, enum MotorKey key, float value) {
 	msg.id_rw.id = key;
 	msg.id_rw.rw = 1;
 	dprintf(fd, "%u%f\n", msg.num, value);
+}
+
+char* motor_string_from_key(enum MotorKey key) {
+	return motor_key_names[key];	
 }
