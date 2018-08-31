@@ -131,6 +131,9 @@ static void motion_server_init_configs(MotionServer* server, char* config_dir) {
 	/* Load motor configurations */
 	motor_load_or_write_defaults_from_dir(config_dir, "gantry.cfg", &server->motor_array.gantry_config);
 
+	/* Load calibration configuration */
+	calib_load_or_write_defaults_from_dir(config_dir, "calib.cfg", &server->calib_config);
+
 	/* Bootstrap motors */
 	for (int i = 0; i < server->motor_array_size; i++) {
 		MotorConfig* select = &server->motor_array_ptr[i];
@@ -207,7 +210,7 @@ static int motion_server_parse_command(MotionServer* server, char* input_string)
 
 static void motion_server_vision_handle(MotionServer* server, char* input_string) {
 	float target_vision = atof(input_string);
-	float target_enc = 0.0;
+	float target_enc = (server->calib_config.enc_per_mm * target_vision) + server->calib_config.offset_mm;
 	motion_server_select_motor_send(server, &server->motor_array.gantry_config, motor_key_target, target_enc);
 }
 
@@ -310,7 +313,7 @@ int motion_server_loop(MotionServer* server) {
 	if (server->fd_array.vision_fd.revents & POLLIN) {
 		char buf[512] = {0};
 		size_t n_read = read(server->fd_array.vision_fd.fd, buf, 512);
-		inform_log(log_info, "Vision says: %s", buf);
+		motion_server_vision_handle(server, buf);
 	}
 
 	/* Handle command line activity */

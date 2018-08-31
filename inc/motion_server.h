@@ -7,6 +7,7 @@
 #include <util.h>
 #include <server_config.h>
 #include <motor_config.h>
+#include <calib_config.h>
 #include <sys/types.h>
 #include <dirent.h>
 #include <poll.h>
@@ -28,6 +29,7 @@
 /* Motion server struct. Contains necessary info to run the motion server. */
 typedef struct MotionServer {
 	ServerConfig server_config;
+	CalibConfig calib_config;
 	struct {
 		MotorConfig gantry_config;
 	} motor_array;
