@@ -18,7 +18,8 @@ static inline void motion_server_select_motor_send(MotionServer* server, MotorCo
 static inline float motion_server_select_motor_read(MotionServer* server, MotorConfig* motor, enum MotorKey key);
 static inline void motion_server_bootstrap_motor(MotionServer* server, MotorConfig* motor);
 static inline MotorConfig* motion_server_motor_by_address(MotionServer* server, unsigned char address);
-static inline int  motion_server_parse_command(MotionServer* server, char* input_string);
+static inline int motion_server_parse_command(MotionServer* server, char* input_string);
+static inline void motion_server_vision_handle(MotionServer* server, char* input_string);
 
 /* Find an i2c device file and return the file descriptor. 
  * Searches /dev/i2c-* from 0 to MAX_I2C_DEV_SEARCH. */
@@ -204,6 +205,12 @@ static int motion_server_parse_command(MotionServer* server, char* input_string)
 	return keep_running;
 }
 
+static void motion_server_vision_handle(MotionServer* server, char* input_string) {
+	float target_vision = atof(input_string);
+	float target_enc = 0.0;
+	motion_server_select_motor_send(server, &server->motor_array.gantry_config, motor_key_target, target_enc);
+}
+
 static void motion_server_init_socket(MotionServer* server) {
 	/* Calculate size of internal fd array */
 	server->fd_array_size = sizeof(server->fd_array) / sizeof(struct pollfd);
@@ -336,6 +343,12 @@ int motion_server_loop(MotionServer* server) {
 }
 
 void motion_server_destruct(MotionServer* server) {
+	/* Stall the motors */
+	for (int i = 0; i < server->motor_array_size; i++) {
+		MotorConfig* select = &server->motor_array_ptr[i];
+		motion_server_bootstrap_motor(server, select);
+	}
+
 	/* Clean up readline */
 	rl_reset_line_state();
 	rl_restore_prompt();
