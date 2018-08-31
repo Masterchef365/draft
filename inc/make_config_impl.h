@@ -1,18 +1,17 @@
 /* This should only be included once per config type in the project */
 
-CONFIG_FUNCTION_PREFIX(hash_cache) CONFIG_FUNCTION_PREFIX(create_hash_cache) () {
-	CONFIG_FUNCTION_PREFIX(hash_cache) cache;
-#define MEMBER(TYPE, NAME, FORMAT) cache.NAME##_hash = str_hash(#NAME);
+void CONFIG_FUNCTION_PREFIX(create_hash_cache) (CONFIG_FUNCTION_PREFIX(hash_cache)* cache) {
+#define MEMBER(TYPE, NAME, FORMAT) cache->NAME##_hash = str_hash(#NAME);
 	MEMBERS();
 #undef MEMBER
-	return cache;
 }
 
 void CONFIG_FUNCTION_PREFIX(parse_config) (FILE* file, CONFIG_STRUCT_NAME* config) {
 	char key_buf[64];
 	char value_buf[64];
 
-	CONFIG_FUNCTION_PREFIX(hash_cache) cache = CONFIG_FUNCTION_PREFIX(create_hash_cache) ();
+	CONFIG_FUNCTION_PREFIX(hash_cache) cache;
+	CONFIG_FUNCTION_PREFIX(create_hash_cache) (&cache);
 
 	bzero(config, sizeof(CONFIG_STRUCT_NAME));
 	bzero(key_buf, sizeof(key_buf));

@@ -14,3 +14,10 @@ enum MotorKey motor_key_from_string(char* input) {
 	}
 	return motor_key_count;
 }
+
+void motor_send_var(int fd, enum MotorKey key, float value) {
+	union MotorKeyMessage msg;
+	msg.id_rw.id = key;
+	msg.id_rw.rw = 1;
+	dprintf(fd, "%u%f\n", msg.num, value);
+}

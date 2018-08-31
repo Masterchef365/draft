@@ -3,7 +3,7 @@
 #include <motion_server.h>
 #include <motor.h>
 
-const char* debug_i2c_flag_str = "-debug_i2c"; /* Flag string to display and match against */
+const char* debug_i2c_flag_str = "-debug-i2c"; /* Flag string to display and match against */
 
 int main(int argc, char** argv) {
 	/* Warn user of incorrect usage and exit */
@@ -17,10 +17,6 @@ int main(int argc, char** argv) {
 	if (argc == 3 && strcmp(argv[2], debug_i2c_flag_str) == 0) {
 		debug_i2c = 1;
 		inform_log(log_warn, "Running in I2C debug mode. Remove %s to disable.", debug_i2c_flag_str);
-	}
-
-	for (int i = 0; i <= motor_key_count; i++) {
-		inform_log(log_silent, "%i: %s", i, motor_key_names[i]);
 	}
 
 	MotionServer server;

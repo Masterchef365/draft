@@ -12,6 +12,9 @@
 #include <poll.h>
 #include <prettylog.h>
 #include <readline/readline.h>
+#include <fcntl.h>
+#include <stropts.h>
+#include <linux/i2c-dev.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -20,13 +23,20 @@
 #include <unistd.h>
 #include <netdb.h> 
 
+#include <motor.h>
+
 /* Motion server struct. Contains necessary info to run the motion server. */
 typedef struct MotionServer {
 	ServerConfig server_config;
-	MotorConfig gantry_config;
+	struct {
+		MotorConfig gantry_config;
+	} motor_array;
+	size_t motor_array_size;
+	MotorConfig* motor_array_ptr;
 
 	int debug_i2c;
 	int i2c_bus_fd;
+	int i2c_last_addr;
 
 	/* polling file descriptor tagged array */
 	struct {

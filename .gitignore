@@ -3,3 +3,4 @@ main
 .sconsign.dblite
 compile_commands.json
 disabled/
+line_count.sh

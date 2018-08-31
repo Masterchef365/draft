@@ -45,7 +45,7 @@ typedef struct CONFIG_FUNCTION_PREFIX(hash_cache) {
 /* Create the function <prefix>_create_hash_cache(),
  * instantiates an instance of the <prefix>_hash_cache struct 
  * and populates it with the hashes of all of the variable names */
-extern CONFIG_FUNCTION_PREFIX(hash_cache) CONFIG_FUNCTION_PREFIX(create_hash_cache) ();
+extern void CONFIG_FUNCTION_PREFIX(create_hash_cache) (CONFIG_FUNCTION_PREFIX(hash_cache)* cache);
 
 /* Create the function <prefix>_parse_config() which 
  * creates an instance of the Config struct (named CONFIG_STRUCT_NAME)

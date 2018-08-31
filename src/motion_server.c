@@ -14,6 +14,9 @@ static inline void motion_server_init_commandline(MotionServer* server);
 static inline void motion_server_init_socket(MotionServer* server);
 static inline void motion_server_new_client(MotionServer* server);
 static inline void motion_server_new_client_set_id(MotionServer* server);
+static inline void motion_server_select_motor_send(MotionServer* server, MotorConfig* motor, enum MotorKey key, float value);
+static inline void motion_server_bootstrap_motor(MotionServer* server, MotorConfig* motor);
+static inline MotorConfig* motion_server_motor_by_address(MotionServer* server, unsigned char address);
 static inline int  motion_server_parse_command(MotionServer* server, char* input_string);
 
 /* Find an i2c device file and return the file descriptor. 
@@ -42,7 +45,48 @@ static void option_reassign_socket(struct pollfd* target, int new_fd) {
 	target->fd = new_fd;
 }
 
+/* Note: We use the config here as it can supply info on what 
+ * address the motor has and can mutate the settings in the config as such */
+static void motion_server_select_motor_send(MotionServer* server, MotorConfig* motor, enum MotorKey key, float value) {
+	if (key == motor_key_count || key == motor_key_none) {
+		inform_log(log_warn, "Invalid motor key!");
+		return;
+	}
+
+	if (server->debug_i2c) {
+		inform_log(log_info, "I2C_DEBUG: (0x%hhx) %s = %f", motor->address, motor_key_names[key], value);
+	} else {
+		/* If the last address sent to/received from isn't the current 
+		 * selected address, tell the fd to point to that address */
+		if (motor->address != server->i2c_last_addr && ioctl(server->i2c_bus_fd, I2C_SLAVE, motor->address) == -1) {
+			inform_log(log_fail, "Failed to communicate with slave address 0x%hhx\n", motor->address);
+			return;
+		}
+
+		motor_send_var(server->i2c_bus_fd, key, value);
+	}
+}
+
+static MotorConfig* motion_server_motor_by_address(MotionServer* server, unsigned char address) {
+	for (int i = 0; i < server->motor_array_size; i++) {
+		MotorConfig* select = &server->motor_array_ptr[i];
+		if (select->address == address) {
+			return select;
+		}
+	}
+	return NULL;
+}
+
+static void motion_server_bootstrap_motor(MotionServer* server, MotorConfig* motor) {
+	motion_server_select_motor_send(server, motor, motor_key_kp, motor->Kp);
+	motion_server_select_motor_send(server, motor, motor_key_ki, motor->Ki);
+	motion_server_select_motor_send(server, motor, motor_key_kd, motor->Kd);
+}
+
 static void motion_server_init_configs(MotionServer* server, char* config_dir) {
+	/* Turn the motor configs into an array */
+	server->motor_array_size = sizeof(server->motor_array) / sizeof(MotorConfig);
+	server->motor_array_ptr = (MotorConfig*)&server->motor_array;
 
 	/* Warn user of nonexistant config dir and exit */
 	if (closedir(opendir(config_dir)) == -1) {
@@ -56,7 +100,13 @@ static void motion_server_init_configs(MotionServer* server, char* config_dir) {
 	server_load_or_write_defaults_from_dir(config_dir, "server.cfg", &server->server_config);
 
 	/* Load motor configurations */
-	motor_load_or_write_defaults_from_dir(config_dir, "gantry.cfg", &server->gantry_config);
+	motor_load_or_write_defaults_from_dir(config_dir, "gantry.cfg", &server->motor_array.gantry_config);
+
+	/* Bootstrap motors */
+	for (int i = 0; i < server->motor_array_size; i++) {
+		MotorConfig* select = &server->motor_array_ptr[i];
+		motion_server_bootstrap_motor(server, select);
+	}
 
 }
 
@@ -69,7 +119,7 @@ static void motion_server_init_commandline(MotionServer* server) {
 	server->fd_array.cmdline_fd.events = POLLIN;
 }
 
-static inline int  motion_server_parse_command(MotionServer* server, char* input_string) {
+static int motion_server_parse_command(MotionServer* server, char* input_string) {
 	int keep_running = 1;
 	char* command_root = strtok(input_string, " ");
 	if (strcmp(command_root, "ls") == 0) {
@@ -84,12 +134,36 @@ static inline int  motion_server_parse_command(MotionServer* server, char* input
 		} else {
 			inform_log(log_info, "Expected target");
 		}
-
 	} else if (strcmp(command_root, "q") == 0 || strcmp(command_root, "exit") == 0) {
 		keep_running = 0;
 	} else if (strcmp(command_root, "clear") == 0) {
 		printf("\e[3J\e[H\e[2J");
 		rl_forced_update_display();
+	} else if (strcmp(command_root, "set") == 0) {
+		char* addrs_str = strtok(NULL, " ");
+		char* field_str = strtok(NULL, " ");
+		char* value_str = strtok(NULL, " ");
+		if (!addrs_str || !field_str || !value_str) {
+			inform_log(log_warn, "Expected command form: set <addr> <field> <value>", command_root);
+		} else {
+			unsigned char address = 0;
+			sscanf(addrs_str, "0x%hhx", &address);
+			enum MotorKey key = motor_key_from_string(field_str);
+			if (key == motor_key_count) {
+				inform_log(log_info, "Motor key must be one of:");
+				for (int i = 0; i <= motor_key_count; i++) {
+					inform_log(log_silent, "%s", i, motor_key_names[i]);
+				}
+			}
+
+			float value = atof(value_str);
+			MotorConfig* config = motion_server_motor_by_address(server, address);
+			if (config) {
+				motion_server_select_motor_send(server, config, key, value);
+			} else {
+				inform_log(log_info, "No motor at address %s", addrs_str);
+			}
+		}
 	} else {
 		inform_log(log_info, "Unrecognized command: %s", command_root);
 	}
@@ -104,7 +178,7 @@ static void motion_server_init_socket(MotionServer* server) {
 	/* Joystick file descriptor */
 	server->fd_array.joystick_fd.events = POLLIN | POLLHUP;
 	server->fd_array.joystick_fd.fd = -1; /* -1 indicates disconnected */
-	
+
 	/* Unkown connection file descriptor; 
 	 * handles new unassigned connections. */
 	server->fd_array.new_fd.events = POLLIN | POLLHUP;
@@ -141,6 +215,7 @@ static void motion_server_init_socket(MotionServer* server) {
 }
 
 void motion_server_init(MotionServer* server, char* config_dir, int debug_i2c) {
+	bzero(server, sizeof(MotionServer));
 	server->debug_i2c = debug_i2c;
 
 	/* Read server configs */
