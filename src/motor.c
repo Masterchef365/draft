@@ -19,7 +19,25 @@ void motor_send_var(int fd, enum MotorKey key, float value) {
 	union MotorKeyMessage msg;
 	msg.id_rw.id = key;
 	msg.id_rw.rw = 1;
-	dprintf(fd, "%u%f\n", msg.num, value);
+	dprintf(fd, "%c%f\n", msg.num, value);
+}
+
+float motor_read_var(int fd, enum MotorKey key) {
+	union MotorKeyMessage msg_out;
+	msg_out.id_rw.id = key;
+	msg_out.id_rw.rw = 0;
+	dprintf(fd, "%c%f\n", msg_out.num, 0.0);
+
+	union MotorKeyMessage msg_in;
+	char buf[512];
+	size_t n_read = read(fd, buf, 512);
+	inform_log(log_info, "n_read: %i", n_read);
+	float num;
+	sscanf("%c%f", &msg_in.num, &num);
+	if (msg_in.id_rw.id != msg_out.id_rw.id) {
+		inform_log(log_warn, "Receive did not match send!");
+	}
+	return num;
 }
 
 char* motor_string_from_key(enum MotorKey key) {

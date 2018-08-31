@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <prettylog.h>
 
 #define MOTOR_KEYS() \
 	KEY(target) \
@@ -37,5 +39,7 @@ enum MotorKey motor_key_from_string(char* input);
 void motor_send_var(int fd, enum MotorKey key, float value);
 
 char* motor_string_from_key(enum MotorKey key);
+
+float motor_read_var(int fd, enum MotorKey key);
 
 #endif

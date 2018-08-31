@@ -15,6 +15,7 @@ static inline void motion_server_init_socket(MotionServer* server);
 static inline void motion_server_new_client(MotionServer* server);
 static inline void motion_server_new_client_set_id(MotionServer* server);
 static inline void motion_server_select_motor_send(MotionServer* server, MotorConfig* motor, enum MotorKey key, float value);
+static inline float motion_server_select_motor_read(MotionServer* server, MotorConfig* motor, enum MotorKey key);
 static inline void motion_server_bootstrap_motor(MotionServer* server, MotorConfig* motor);
 static inline MotorConfig* motion_server_motor_by_address(MotionServer* server, unsigned char address);
 static inline int  motion_server_parse_command(MotionServer* server, char* input_string);
@@ -26,7 +27,10 @@ int get_first_i2c_fd () {
 	int fd;
 	for (int i = 0; i < 20; i++) {
 		snprintf(dir_name_buf, 64, "/dev/i2c-%i", i);
-		if ((fd = open(dir_name_buf, O_RDWR)) != -1) return fd;
+		if ((fd = open(dir_name_buf, O_RDWR)) != -1) {
+			inform_log(log_info, "I2C bus: %s", dir_name_buf);
+			return fd;
+		}
 	}
 	return fd;
 }
@@ -67,6 +71,26 @@ static void motion_server_select_motor_send(MotionServer* server, MotorConfig* m
 	}
 }
 
+static inline float motion_server_select_motor_read(MotionServer* server, MotorConfig* motor, enum MotorKey key) {
+	if (key == motor_key_count || key == motor_key_none) {
+		inform_log(log_warn, "Invalid motor key!");
+		return 0.0;
+	}
+
+	if (server->debug_i2c) {
+		inform_log(log_info, "I2C_DEBUG: (0x%hhx) %s = %f", motor->address, motor_string_from_key(key), 0.0);
+		return 0.0;
+	} else {
+		/* If the last address sent to/received from isn't the current 
+		 * selected address, tell the fd to point to that address */
+		if (motor->address != server->i2c_last_addr && ioctl(server->i2c_bus_fd, I2C_SLAVE, motor->address) == -1) {
+			inform_log(log_fail, "Failed to communicate with slave address 0x%hhx\n", motor->address);
+			return 0.0;
+		}
+		return motor_read_var(server->i2c_bus_fd, key);
+	}
+}
+
 static MotorConfig* motion_server_motor_by_address(MotionServer* server, unsigned char address) {
 	for (int i = 0; i < server->motor_array_size; i++) {
 		MotorConfig* select = &server->motor_array_ptr[i];
@@ -81,6 +105,8 @@ static void motion_server_bootstrap_motor(MotionServer* server, MotorConfig* mot
 	motion_server_select_motor_send(server, motor, motor_key_kp, motor->Kp);
 	motion_server_select_motor_send(server, motor, motor_key_ki, motor->Ki);
 	motion_server_select_motor_send(server, motor, motor_key_kd, motor->Kd);
+	motion_server_select_motor_send(server, motor, motor_key_max_pwm, motor->max_pwm);
+	motion_server_select_motor_send(server, motor, motor_key_home_pwm, motor->home_pwm);
 	motion_server_select_motor_send(server, motor, motor_key_enable, 0);
 	motion_server_select_motor_send(server, motor, motor_key_home, 0);
 }
@@ -141,12 +167,12 @@ static int motion_server_parse_command(MotionServer* server, char* input_string)
 	} else if (strcmp(command_root, "clear") == 0) {
 		printf("\e[3J\e[H\e[2J");
 		rl_forced_update_display();
-	} else if (strcmp(command_root, "set") == 0) {
+	} else if (strcmp(command_root, "set") == 0 || strcmp(command_root, "read") == 0) {
 		char* addrs_str = strtok(NULL, " ");
 		char* field_str = strtok(NULL, " ");
 		char* value_str = strtok(NULL, " ");
 		if (!addrs_str || !field_str || !value_str) {
-			inform_log(log_warn, "Expected command form: set <addr> <field> <value>", command_root);
+			inform_log(log_warn, "Expected command form: %s <addr> <field> <value>", command_root);
 		} else {
 			unsigned char address = 0;
 			sscanf(addrs_str, "0x%hhx", &address);
@@ -163,7 +189,11 @@ static int motion_server_parse_command(MotionServer* server, char* input_string)
 
 			MotorConfig* config = motion_server_motor_by_address(server, address);
 			if (config) {
-				motion_server_select_motor_send(server, config, key, value);
+				if (strcmp(command_root, "set") == 0) {
+					motion_server_select_motor_send(server, config, key, value);
+				} else {
+					inform_log(log_info, "Controller sent back: %f", motion_server_select_motor_read(server, config, key));
+				}
 			} else {
 				inform_log(log_info, "No motor at address %s", addrs_str);
 			}
@@ -222,15 +252,15 @@ void motion_server_init(MotionServer* server, char* config_dir, int debug_i2c) {
 	bzero(server, sizeof(MotionServer));
 	server->debug_i2c = debug_i2c;
 
-	/* Read server configs */
-	motion_server_init_configs(server, config_dir);
-
 	/* If we aren't debugging, find and open an I2C device */
 	server->i2c_bus_fd = -1;
 	if (!server->debug_i2c && (server->i2c_bus_fd = get_first_i2c_fd()) == -1) {
 		inform_log(log_fail, "Not in debug mode, and failed to find a suitible i2c bus in /dev/. Exiting.");
 		exit(EXIT_FAILURE);
 	}
+
+	/* Read server configs */
+	motion_server_init_configs(server, config_dir);
 
 	/* Create socket and begin listening */
 	motion_server_init_socket(server);
