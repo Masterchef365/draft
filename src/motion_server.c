@@ -296,7 +296,9 @@ static void motion_server_new_client(MotionServer* server) {
 static inline void motion_server_new_client_set_id(MotionServer* server) {
 	char buf[512] = {0};
 	size_t n_read = read(server->fd_array.new_fd.fd, buf, 512);
-	if (strcmp(buf, "id:vision\n") == 0) {
+	if (n_read == 0) {
+        option_reassign_socket(&server->fd_array.new_fd, -1);
+    } else if (strcmp(buf, "id:vision\n") == 0) {
 		inform_log(log_info, "Vision assigned");
 		option_reassign_socket(&server->fd_array.vision_fd, server->fd_array.new_fd.fd);
 		server->fd_array.new_fd.fd = -1;
@@ -313,7 +315,11 @@ int motion_server_loop(MotionServer* server) {
 	if (server->fd_array.vision_fd.revents & POLLIN) {
 		char buf[512] = {0};
 		size_t n_read = read(server->fd_array.vision_fd.fd, buf, 512);
-		motion_server_vision_handle(server, buf);
+        if (n_read == 0) { 
+		    option_reassign_socket(&server->fd_array.vision_fd, -1);
+        } else {
+		    motion_server_vision_handle(server, buf);
+        }
 	}
 
 	/* Handle command line activity */
