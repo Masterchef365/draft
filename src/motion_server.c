@@ -49,6 +49,7 @@ static void option_reassign_socket(struct pollfd* target, int new_fd) {
 			inform_log(log_warn, "Kicked an old client in favor of a new connection");
 	}
 	target->fd = new_fd;
+    target->events = POLLIN;
 }
 
 /* Note: We use the config here as it can supply info on what 
@@ -229,16 +230,16 @@ static void motion_server_init_socket(MotionServer* server) {
 	server->fd_array_ptr = (struct pollfd*)&server->fd_array;
 
 	/* Vision file descriptor */
-	server->fd_array.vision_fd.events = POLLIN | POLLHUP;
+	server->fd_array.vision_fd.events = POLLIN;
 	server->fd_array.vision_fd.fd = -1; /* -1 indicates disconnected */
 
 	/* Unkown connection file descriptor; 
 	 * handles new unassigned connections. */
-	server->fd_array.new_fd.events = POLLIN | POLLHUP;
+	server->fd_array.new_fd.events = POLLIN;
 	server->fd_array.new_fd.fd = -1; /* -1 indicates disconnected */
 
 	/* Server file descriptor. Handles async client acception. */
-	server->fd_array.server_fd.events = POLLIN | POLLHUP;
+	server->fd_array.server_fd.events = POLLIN;
 	server->fd_array.server_fd.fd = -1; /* -1 indicates disconnected */
 
 	/* Server socket */
@@ -306,8 +307,8 @@ static void motion_server_new_client(MotionServer* server) {
 
 /* Handle converting an anonymous client into a handled one */
 static inline void motion_server_new_client_set_id(MotionServer* server) {
-	char buf[512] = {0};
-	size_t n_read = read(server->fd_array.new_fd.fd, buf, 512);
+	char buf[10] = {0};
+	size_t n_read = read(server->fd_array.new_fd.fd, buf, 10);
 	if (n_read == 0) {
         option_reassign_socket(&server->fd_array.new_fd, -1);
     } else if (strcmp(buf, "id:vision\n") == 0) {
