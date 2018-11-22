@@ -9,17 +9,17 @@ static void option_reassign_socket(struct pollfd* target, int new_fd);
  * without a callback. Eww. */
 static char last_command_line[512]; 
 
-static inline void motion_server_init_configs(MotionServer* server, char* config_dir);
-static inline void motion_server_init_commandline(MotionServer* server);
-static inline void motion_server_init_socket(MotionServer* server);
-static inline void motion_server_new_client(MotionServer* server);
-static inline void motion_server_new_client_set_id(MotionServer* server);
-static inline void motion_server_select_motor_send(MotionServer* server, MotorConfig* motor, enum MotorKey key, float value);
-static inline float motion_server_select_motor_read(MotionServer* server, MotorConfig* motor, enum MotorKey key);
-static inline void motion_server_bootstrap_motor(MotionServer* server, MotorConfig* motor);
-static inline MotorConfig* motion_server_motor_by_address(MotionServer* server, unsigned char address);
-static inline int motion_server_parse_command(MotionServer* server, char* input_string);
-static inline void motion_server_vision_handle(MotionServer* server, char* input_string);
+static void motion_server_init_configs(MotionServer* server, char* config_dir);
+static void motion_server_init_commandline(MotionServer* server);
+static void motion_server_init_socket(MotionServer* server);
+static void motion_server_new_client(MotionServer* server);
+static void motion_server_new_client_set_id(MotionServer* server);
+static void motion_server_select_motor_send(MotionServer* server, MotorConfig* motor, enum MotorKey key, float value);
+static float motion_server_select_motor_read(MotionServer* server, MotorConfig* motor, enum MotorKey key);
+static void motion_server_bootstrap_motor(MotionServer* server, MotorConfig* motor);
+static MotorConfig* motion_server_motor_by_address(MotionServer* server, unsigned char address);
+static int motion_server_parse_command(MotionServer* server, char* input_string);
+static void motion_server_vision_handle(MotionServer* server, char* input_string);
 
 /* Find an i2c device file and return the file descriptor. 
  * Searches /dev/i2c-* from 0 to MAX_I2C_DEV_SEARCH. */
@@ -41,6 +41,7 @@ static void line_handler(char* line) {
 	strcpy(last_command_line, line);
 }
 
+/* If the socket is invalid, close it. Assign it. */
 static void option_reassign_socket(struct pollfd* target, int new_fd) {
 	if (target->fd != -1) {
 		close(target->fd);
@@ -51,7 +52,8 @@ static void option_reassign_socket(struct pollfd* target, int new_fd) {
 }
 
 /* Note: We use the config here as it can supply info on what 
- * address the motor has and can mutate the settings in the config as such */
+ * address the motor has and can mutate the settings in the config as such
+ * Send a float to a motor over I2C */
 static void motion_server_select_motor_send(MotionServer* server, MotorConfig* motor, enum MotorKey key, float value) {
 	if (key == motor_key_count || key == motor_key_none) {
 		inform_log(log_warn, "Invalid motor key!");
@@ -92,6 +94,7 @@ static inline float motion_server_select_motor_read(MotionServer* server, MotorC
 	}
 }
 
+/* Get a motor by address */
 static MotorConfig* motion_server_motor_by_address(MotionServer* server, unsigned char address) {
 	for (int i = 0; i < server->motor_array_size; i++) {
 		MotorConfig* select = &server->motor_array_ptr[i];
@@ -102,6 +105,7 @@ static MotorConfig* motion_server_motor_by_address(MotionServer* server, unsigne
 	return NULL;
 }
 
+/* Set up initial values for a motor. Also loads values from the config. */
 static void motion_server_bootstrap_motor(MotionServer* server, MotorConfig* motor) {
 	motion_server_select_motor_send(server, motor, motor_key_kp, motor->Kp);
 	motion_server_select_motor_send(server, motor, motor_key_ki, motor->Ki);
@@ -112,6 +116,7 @@ static void motion_server_bootstrap_motor(MotionServer* server, MotorConfig* mot
 	motion_server_select_motor_send(server, motor, motor_key_home, 0);
 }
 
+/* Initialize the motion server */
 static void motion_server_init_configs(MotionServer* server, char* config_dir) {
 	/* Turn the motor configs into an array */
 	server->motor_array_size = sizeof(server->motor_array) / sizeof(MotorConfig);
@@ -142,6 +147,7 @@ static void motion_server_init_configs(MotionServer* server, char* config_dir) {
 
 }
 
+/* Initialize motion server command line */
 static void motion_server_init_commandline(MotionServer* server) {
 	/* Create GNU readline command line handler */
 	rl_callback_handler_install("> ", line_handler);
@@ -151,6 +157,7 @@ static void motion_server_init_commandline(MotionServer* server) {
 	server->fd_array.cmdline_fd.events = POLLIN;
 }
 
+/* Operate on command line input */
 static int motion_server_parse_command(MotionServer* server, char* input_string) {
 	int keep_running = 1;
 	char* command_root = strtok(input_string, " ");
@@ -208,12 +215,14 @@ static int motion_server_parse_command(MotionServer* server, char* input_string)
 	return keep_running;
 }
 
+/* Handle vision input */
 static void motion_server_vision_handle(MotionServer* server, char* input_string) {
 	float target_vision = atof(input_string);
 	float target_enc = (server->calib_config.enc_per_mm * target_vision) + server->calib_config.offset_mm;
 	motion_server_select_motor_send(server, &server->motor_array.gantry_config, motor_key_target, target_enc);
 }
 
+/* Initialize motion server sockets */
 static void motion_server_init_socket(MotionServer* server) {
 	/* Calculate size of internal fd array */
 	server->fd_array_size = sizeof(server->fd_array) / sizeof(struct pollfd);
@@ -258,6 +267,7 @@ static void motion_server_init_socket(MotionServer* server) {
 	listen(server->fd_array.server_fd.fd, 5);
 }
 
+/* Initialize motion server */
 void motion_server_init(MotionServer* server, char* config_dir, int debug_i2c) {
 	bzero(server, sizeof(MotionServer));
 	server->debug_i2c = debug_i2c;
@@ -279,6 +289,7 @@ void motion_server_init(MotionServer* server, char* config_dir, int debug_i2c) {
 	motion_server_init_commandline(server);
 }
 
+/* Handle a new client */
 static void motion_server_new_client(MotionServer* server) {
 	struct sockaddr_in cli_addr; /* Client address struct */
 	socklen_t clilen = sizeof(cli_addr);
@@ -293,6 +304,7 @@ static void motion_server_new_client(MotionServer* server) {
 	inform_log(log_info, "New client from [%s]", ipstr);
 }
 
+/* Handle converting an anonymous client into a handled one */
 static inline void motion_server_new_client_set_id(MotionServer* server) {
 	char buf[512] = {0};
 	size_t n_read = read(server->fd_array.new_fd.fd, buf, 512);
@@ -305,6 +317,7 @@ static inline void motion_server_new_client_set_id(MotionServer* server) {
 	}
 }
 
+/* Main looop */
 int motion_server_loop(MotionServer* server) {
 	int keep_running = 1;
 
@@ -351,6 +364,7 @@ int motion_server_loop(MotionServer* server) {
 	return keep_running;
 }
 
+/* Destruct a motion server */
 void motion_server_destruct(MotionServer* server) {
 	/* Stall the motors */
 	for (int i = 0; i < server->motor_array_size; i++) {
